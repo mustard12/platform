@@ -30,7 +30,7 @@ else
 	BUILD_TYPE_NAME = team
 endif
 BUILD_WEBAPP_DIR = ./webapp
-
+##
 # Golang Flags
 GOPATH ?= $(GOPATH:):./vendor
 GOFLAGS ?= $(GOFLAGS:)
