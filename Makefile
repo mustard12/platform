@@ -30,7 +30,7 @@ else
 	BUILD_TYPE_NAME = team
 endif
 BUILD_WEBAPP_DIR = ./webapp
-##
+
 # Golang Flags
 GOPATH ?= $(GOPATH:):./vendor
 GOFLAGS ?= $(GOFLAGS:)
@@ -59,7 +59,7 @@ dist: | check-style test package
 start-docker:
 	@echo Starting docker containers
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-mysql) -eq 0 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-mysql) -eq 0 ]; then \
 		echo starting mattermost-mysql; \
 		sudo docker run --name mattermost-mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=mostest \
 		-e MYSQL_USER=mmuser -e MYSQL_PASSWORD=mostest -e MYSQL_DATABASE=mattermost_test -d mysql:5.7 > /dev/null; \
@@ -68,26 +68,26 @@ start-docker:
 		sudo docker start mattermost-mysql > /dev/null; \
 	fi
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-postgres) -eq 0 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-postgres) -eq 0 ]; then \
 		echo starting mattermost-postgres; \
 		sudo docker run --name mattermost-postgres -p 5432:5432 -e POSTGRES_USER=mmuser -e POSTGRES_PASSWORD=mostest \
 		-d postgres:9.4 > /dev/null; \
-	elif [ $(shell docker ps | grep -ci mattermost-postgres) -eq 0 ]; then \
+	elif [ $(shell sudo docker  ps | grep -ci mattermost-postgres) -eq 0 ]; then \
 		echo restarting mattermost-postgres; \
 		sudo docker start mattermost-postgres > /dev/null; \
 	fi
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-webrtc) -eq 0 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-webrtc) -eq 0 ]; then \
     	echo starting mattermost-webrtc; \
         sudo docker run --name mattermost-webrtc -p 7088:7088 -p 7089:7089 -p 8188:8188 -p 8189:8189 -d mattermost/webrtc:latest > /dev/null; \
-    elif [ $(shell docker ps | grep -ci mattermost-webrtc) -eq 0 ]; then \
+    elif [ $(shell sudo docker  ps | grep -ci mattermost-webrtc) -eq 0 ]; then \
     	echo restarting mattermost-webrtc; \
         sudo docker start mattermost-webrtc > /dev/null; \
     fi
 
 ifeq ($(BUILD_ENTERPRISE_READY),true)
 	@echo Ldap test user test.one
-	@if [ $(shell docker ps -a | grep -ci mattermost-openldap) -eq 0 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-openldap) -eq 0 ]; then \
 		echo starting mattermost-openldap; \
 		sudo docker run --name mattermost-openldap -p 389:389 -p 636:636 \
 			-e LDAP_TLS_VERIFY_CLIENT="never" \
@@ -102,7 +102,7 @@ ifeq ($(BUILD_ENTERPRISE_READY),true)
 		sudo docker exec -ti mattermost-openldap bash -c 'echo -e "dn: uid=test.two,ou=testusers,dc=mm,dc=test,dc=com\nobjectclass: iNetOrgPerson\nsn: User\ncn: Test2\nmail: success+testtwo@simulator.amazonses.com" | ldapadd -x -D "cn=admin,dc=mm,dc=test,dc=com" -w mostest';\
 		sudo docker exec -ti mattermost-openldap bash -c 'ldappasswd -s Password1 -D "cn=admin,dc=mm,dc=test,dc=com" -x "uid=test.two,ou=testusers,dc=mm,dc=test,dc=com" -w mostest';\
 		sudo docker exec -ti mattermost-openldap bash -c 'echo -e "dn: cn=tgroup,ou=testusers,dc=mm,dc=test,dc=com\nobjectclass: groupOfUniqueNames\nuniqueMember: uid=test.one,ou=testusers,dc=mm,dc=test,dc=com" | ldapadd -x -D "cn=admin,dc=mm,dc=test,dc=com" -w mostest';\
-	elif [ $(shell docker ps | grep -ci mattermost-openldap) -eq 0 ]; then \
+	elif [ $(shell sudo docker  ps | grep -ci mattermost-openldap) -eq 0 ]; then \
 		echo restarting mattermost-openldap; \
 		sudo docker start mattermost-openldap > /dev/null; \
 		sleep 10; \
@@ -112,22 +112,22 @@ endif
 stop-docker:
 	@echo Stopping docker containers
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-mysql) -eq 1 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-mysql) -eq 1 ]; then \
 		echo stopping mattermost-mysql; \
 		sudo docker stop mattermost-mysql > /dev/null; \
 	fi
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-postgres) -eq 1 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-postgres) -eq 1 ]; then \
 		echo stopping mattermost-postgres; \
 		sudo docker stop mattermost-postgres > /dev/null; \
 	fi
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-openldap) -eq 1 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-openldap) -eq 1 ]; then \
 		echo stopping mattermost-openldap; \
 		sudo docker stop mattermost-openldap > /dev/null; \
 	fi
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-webrtc) -eq 1 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-webrtc) -eq 1 ]; then \
 		echo stopping mattermost-webrtc; \
 		sudo docker stop mattermost-webrtc > /dev/null; \
 	fi
@@ -135,25 +135,25 @@ stop-docker:
 clean-docker:
 	@echo Removing docker containers
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-mysql) -eq 1 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-mysql) -eq 1 ]; then \
 		echo removing mattermost-mysql; \
 		sudo docker stop mattermost-mysql > /dev/null; \
 		sudo docker rm -v mattermost-mysql > /dev/null; \
 	fi
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-postgres) -eq 1 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-postgres) -eq 1 ]; then \
 		echo removing mattermost-postgres; \
 		sudo docker stop mattermost-postgres > /dev/null; \
 		sudo docker rm -v mattermost-postgres > /dev/null; \
 	fi
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-openldap) -eq 1 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-openldap) -eq 1 ]; then \
 		echo removing mattermost-openldap; \
 		sudo docker stop mattermost-openldap > /dev/null; \
 		sudo docker rm -v mattermost-openldap > /dev/null; \
 	fi
 
-	@if [ $(shell docker ps -a | grep -ci mattermost-webrtc) -eq 1 ]; then \
+	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-webrtc) -eq 1 ]; then \
 		echo removing mattermost-webrtc; \
 		sudo docker stop mattermost-webrtc > /dev/null; \
 		sudo docker rm -v mattermost-webrtc > /dev/null; \
