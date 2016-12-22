@@ -26,7 +26,6 @@ export default class Textbox extends React.Component {
 
         this.focus = this.focus.bind(this);
         this.recalculateSize = this.recalculateSize.bind(this);
-        this.getStateFromStores = this.getStateFromStores.bind(this);
         this.onRecievedError = this.onRecievedError.bind(this);
         this.handleKeyPress = this.handleKeyPress.bind(this);
         this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -46,16 +45,6 @@ export default class Textbox extends React.Component {
         if (props.supportsCommands) {
             this.suggestionProviders.push(new CommandProvider());
         }
-    }
-
-    getStateFromStores() {
-        const error = ErrorStore.getLastError();
-
-        if (error) {
-            return {message: error.message};
-        }
-
-        return {message: null};
     }
 
     componentDidMount() {
@@ -216,7 +205,6 @@ export default class Textbox extends React.Component {
                     className={`form-control custom-textarea ${this.state.connection}`}
                     type='textarea'
                     spellCheck='true'
-                    maxLength={Constants.MAX_POST_LEN}
                     placeholder={this.props.createMessage}
                     onChange={this.props.onChange}
                     onKeyPress={this.handleKeyPress}

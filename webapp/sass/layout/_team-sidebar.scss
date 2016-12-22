@@ -1,0 +1,110 @@
+.multi-teams {
+    .team-sidebar {
+        height: 100%;
+        left: 0;
+        position: fixed;
+        text-align: center;
+        width: 65px;
+        z-index: 5;
+
+        .team-wrapper {
+            background-color: rgba(0, 0, 0, 0.2);
+            height: 100%;
+            overflow: auto;
+            padding-top: 15px;
+
+            .team-container {
+                display: table;
+                margin-bottom: 10px;
+                position: relative;
+                text-align: center;
+                width: 100%;
+
+                .team-btn {
+                    @include border-radius(2px);
+                    background-color: alpha-color($black, .3);
+                    display: table-cell;
+                    font-weight: bold;
+                    position: relative;
+                    text-align: center;
+                    vertical-align: middle;
+                    height: 40px;
+                    width: 40px;
+
+                    .team-btn__content {
+                        font-size: 9px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        width: 40px;
+                        padding: 0 2px;
+                        white-space: nowrap;
+                        position: relative;
+                        top: -3px;
+                    }
+
+                    .badge {
+                        font-size: 10px;
+                        position: absolute;
+                        right: -6px;
+                        top: -3px;
+                    }
+                }
+
+                &.active {
+                    .team-btn {
+                        background-color: transparent;
+                        border: 1px solid $white;
+                        height: 39px;
+                        width: 39px;
+
+                        .team-btn__content {
+                            width: 39px;
+                        }
+                    }
+                }
+
+                &.active:before {
+                    background: $black;
+                    content: '';
+                    height: 100%;
+                    left: 0;
+                    position: absolute;
+                    top: 0;
+                    width: 5px;
+                }
+
+                &.unread:before {
+                    background: $black;
+                    border-radius: 50%;
+                    content: '';
+                    height: 5px;
+                    left: 0;
+                    position: absolute;
+                    top: 18px;
+                    width: 5px;
+                }
+
+                a.team-disabled {
+                    @include opacity(.5);
+                    cursor: not-allowed;
+                }
+            }
+
+            .team-container a:hover {
+                text-decoration: none;
+            }
+        }
+    }
+
+    .sidebar--left {
+        left: 65px;
+
+        .nav-pills__unread-indicator {
+            left: 80px;
+        }
+    }
+
+    .app__content {
+        margin-left: 285px;
+    }
+}

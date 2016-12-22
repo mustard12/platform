@@ -5,11 +5,12 @@ package api
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/mattermost/platform/model"
 	"github.com/mattermost/platform/store"
 	"github.com/mattermost/platform/utils"
-	"strings"
-	"testing"
 )
 
 func TestSignupTeam(t *testing.T) {
@@ -315,10 +316,7 @@ func TestGetAllTeamListings(t *testing.T) {
 		}
 	}
 
-	c := &Context{}
-	c.RequestId = model.NewId()
-	c.IpAddress = "cmd_line"
-	UpdateUserRoles(c, user, model.ROLE_SYSTEM_ADMIN.Id)
+	UpdateUserRoles(user, model.ROLE_SYSTEM_ADMIN.Id)
 
 	Client.Login(user.Email, "passwd1")
 	Client.SetTeamId(team.Id)
@@ -371,7 +369,7 @@ func TestTeamPermDelete(t *testing.T) {
 	c.RequestId = model.NewId()
 	c.IpAddress = "test"
 
-	err := PermanentDeleteTeam(c, team)
+	err := PermanentDeleteTeam(team)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,10 +426,14 @@ func TestInviteMembers(t *testing.T) {
 	}
 
 	isLicensed := utils.IsLicensed
+	license := utils.License
 	defer func() {
 		utils.IsLicensed = isLicensed
+		utils.License = license
 	}()
 	utils.IsLicensed = true
+	utils.License = &model.License{Features: &model.Features{}}
+	utils.License.Features.SetDefaults()
 
 	if _, err := Client.InviteMembers(invites); err == nil {
 		t.Fatal("should have errored not team admin and licensed")
@@ -571,6 +573,41 @@ func TestGetTeamMembers(t *testing.T) {
 
 	if _, err := th.BasicClient.GetTeamMembers("junk", 0, 100); err == nil {
 		t.Fatal("should have errored - bad team id")
+	}
+}
+
+func TestGetMyTeamMembers(t *testing.T) {
+	th := Setup().InitBasic()
+
+	if result, err := th.BasicClient.GetMyTeamMembers(); err != nil {
+		t.Fatal(err)
+	} else {
+		members := result.Data.([]*model.TeamMember)
+		if len(members) == 0 {
+			t.Fatal("should have results")
+		}
+	}
+}
+
+func TestGetMyTeamsUnread(t *testing.T) {
+	th := Setup().InitBasic()
+
+	if result, err := th.BasicClient.GetMyTeamsUnread(""); err != nil {
+		t.Fatal(err)
+	} else {
+		members := result.Data.([]*model.TeamUnread)
+		if len(members) == 0 {
+			t.Fatal("should have results")
+		}
+	}
+
+	if result, err := th.BasicClient.GetMyTeamsUnread(th.BasicTeam.Id); err != nil {
+		t.Fatal(err)
+	} else {
+		members := result.Data.([]*model.TeamUnread)
+		if len(members) != 0 {
+			t.Fatal("should not have results")
+		}
 	}
 }
 
@@ -729,15 +766,11 @@ func TestGetTeamStats(t *testing.T) {
 		}
 	}
 
-	if result, err := th.SystemAdminClient.GetTeamStats("junk"); err != nil {
-		t.Fatal(err)
+	if _, err := th.SystemAdminClient.GetTeamStats("junk"); err == nil {
+		t.Fatal("should fail invalid teamid")
 	} else {
-		if result.Data.(*model.TeamStats).TotalMemberCount != 0 {
-			t.Fatal("wrong count")
-		}
-
-		if result.Data.(*model.TeamStats).ActiveMemberCount != 0 {
-			t.Fatal("wrong count")
+		if err.Id != "store.sql_team.get.find.app_error" {
+			t.Fatal("wrong error. Got: " + err.Id)
 		}
 	}
 
@@ -758,4 +791,113 @@ func TestGetTeamStats(t *testing.T) {
 	if _, err := Client.GetTeamStats(th.BasicTeam.Id); err == nil {
 		t.Fatal("should have errored - not on team")
 	}
+}
+
+func TestUpdateTeamDescription(t *testing.T) {
+	th := Setup().InitBasic()
+	th.BasicClient.Logout()
+	Client := th.BasicClient
+
+	team := &model.Team{DisplayName: "Name", Name: "z-z-" + model.NewId() + "a", Email: "success+" + model.NewId() + "@simulator.amazonses.com", Type: model.TEAM_OPEN}
+	team = Client.Must(Client.CreateTeam(team)).Data.(*model.Team)
+
+	user := &model.User{Email: team.Email, Nickname: "My Testing", Password: "passwd1"}
+	user = Client.Must(Client.CreateUser(user, "")).Data.(*model.User)
+	LinkUserToTeam(user, team)
+	store.Must(Srv.Store.User().VerifyEmail(user.Id))
+
+	user2 := &model.User{Email: "success+" + model.NewId() + "@simulator.amazonses.com", Nickname: "Jabba the Hutt", Password: "passwd1"}
+	user2 = Client.Must(Client.CreateUser(user2, "")).Data.(*model.User)
+	LinkUserToTeam(user2, team)
+	store.Must(Srv.Store.User().VerifyEmail(user2.Id))
+
+	Client.Login(user2.Email, "passwd1")
+	Client.SetTeamId(team.Id)
+
+	vteam := &model.Team{DisplayName: team.DisplayName, Name: team.Name, Description: team.Description, Email: team.Email, Type: team.Type}
+	vteam.Description = "yommamma"
+	if _, err := Client.UpdateTeam(vteam); err == nil {
+		t.Fatal("Should have errored, not admin")
+	}
+
+	Client.Login(user.Email, "passwd1")
+
+	vteam.Description = ""
+	if _, err := Client.UpdateTeam(vteam); err != nil {
+		t.Fatal("Should have errored, should save blank Description")
+	}
+
+	vteam.Description = "yommamma"
+	if _, err := Client.UpdateTeam(vteam); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetTeamByName(t *testing.T) {
+	th := Setup().InitSystemAdmin().InitBasic()
+	th.BasicClient.Logout()
+	Client := th.BasicClient
+
+	team := &model.Team{DisplayName: "Name", Name: "z-z-" + model.NewId() + "a", Email: "success+" + model.NewId() + "@simulator.amazonses.com", Type: model.TEAM_INVITE}
+	team = Client.Must(Client.CreateTeam(team)).Data.(*model.Team)
+
+	team2 := &model.Team{DisplayName: "Name", Name: "z-z-" + model.NewId() + "a", Email: "success+" + model.NewId() + "@simulator.amazonses.com", Type: model.TEAM_OPEN}
+	team2 = Client.Must(Client.CreateTeam(team2)).Data.(*model.Team)
+
+	user := &model.User{Email: team.Email, Nickname: "My Testing", Password: "passwd1"}
+	user = Client.Must(Client.CreateUser(user, "")).Data.(*model.User)
+	LinkUserToTeam(user, team)
+	store.Must(Srv.Store.User().VerifyEmail(user.Id))
+
+	Client.Login(user.Email, "passwd1")
+	if _, err := Client.GetTeamByName(team.Name); err != nil {
+		t.Fatal("Failed to get team")
+	}
+
+	if _, err := Client.GetTeamByName("InvalidTeamName"); err == nil {
+		t.Fatal("Should not exist this team")
+	}
+
+	if _, err := Client.GetTeamByName(team2.Name); err != nil {
+		t.Fatal("Failed to get team")
+	}
+
+	Client.Must(Client.Logout())
+
+	user2 := &model.User{Email: "success+" + model.NewId() + "@simulator.amazonses.com", Nickname: "Jabba the Hutt", Password: "passwd1"}
+	user2 = Client.Must(Client.CreateUser(user2, "")).Data.(*model.User)
+	store.Must(Srv.Store.User().VerifyEmail(user2.Id))
+
+	Client.Login(user2.Email, "passwd1")
+
+	// TEAM_INVITE and user is not part of the team
+	if _, err := Client.GetTeamByName(team.Name); err == nil {
+		t.Fatal("Should not fail dont have permissions to get the team")
+	}
+
+	if _, err := Client.GetTeamByName("InvalidTeamName"); err == nil {
+		t.Fatal("Should not exist this team")
+	}
+
+	// TEAM_OPEN and user is not part of the team
+	if _, err := Client.GetTeamByName(team2.Name); err != nil {
+		t.Fatal("Should not fail team is open")
+	}
+
+	Client.Must(Client.Logout())
+	th.BasicClient.Logout()
+	th.LoginSystemAdmin()
+
+	if _, err := th.SystemAdminClient.GetTeamByName(team.Name); err != nil {
+		t.Fatal("Should not failed to get team the user is admin")
+	}
+
+	if _, err := th.SystemAdminClient.GetTeamByName(team2.Name); err != nil {
+		t.Fatal("Should not failed to get team the user is admin and team is open")
+	}
+
+	if _, err := Client.GetTeamByName("InvalidTeamName"); err == nil {
+		t.Fatal("Should not exist this team")
+	}
+
 }

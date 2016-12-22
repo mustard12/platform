@@ -211,6 +211,23 @@ describe('Client.Channels', function() {
         });
     });
 
+    it('viewChannel', function(done) {
+        TestHelper.initBasic(() => {
+            var channel = TestHelper.basicChannel();
+            TestHelper.basicClient().viewChannel(
+                channel.id,
+                '',
+                0,
+                function() {
+                    done();
+                },
+                function(err) {
+                    done(new Error(err.message));
+                }
+            );
+        });
+    });
+
     it('updateLastViewedAt', function(done) {
         TestHelper.initBasic(() => {
             var channel = TestHelper.basicChannel();
@@ -418,6 +435,21 @@ describe('Client.Channels', function() {
                 TestHelper.basicUser().id,
                 function(data) {
                     assert.equal(data.channel_id.length > 0, true);
+                    done();
+                },
+                function(err) {
+                    done(new Error(err.message));
+                }
+            );
+        });
+    });
+
+    it('getChannelByName', function(done) {
+        TestHelper.initBasic(() => {
+            TestHelper.basicClient().getChannelByName(
+                TestHelper.basicChannel().name,
+                function(data) {
+                    assert.equal(data.name, TestHelper.basicChannel().name);
                     done();
                 },
                 function(err) {

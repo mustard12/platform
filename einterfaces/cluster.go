@@ -14,11 +14,14 @@ type ClusterInterface interface {
 	GetClusterStats() ([]*model.ClusterStats, *model.AppError)
 	RemoveAllSessionsForUserId(userId string)
 	InvalidateCacheForUser(userId string)
+	InvalidateCacheForChannel(channelId string)
+	InvalidateCacheForChannelPosts(channelId string)
 	Publish(event *model.WebSocketEvent)
 	UpdateStatus(status *model.Status)
 	GetLogs() ([]string, *model.AppError)
 	GetClusterId() string
 	ConfigChanged(previousConfig *model.Config, newConfig *model.Config, sendToOtherServer bool) *model.AppError
+	InvalidateAllCaches() *model.AppError
 }
 
 var theClusterInterface ClusterInterface

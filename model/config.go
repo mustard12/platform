@@ -80,6 +80,7 @@ type ServiceSettings struct {
 	EnableSecurityFixAlert            *bool
 	EnableInsecureOutgoingConnections *bool
 	EnableMultifactorAuthentication   *bool
+	EnforceMultifactorAuthentication  *bool
 	AllowCorsFrom                     *string
 	SessionLengthWebInDays            *int
 	SessionLengthMobileInDays         *int
@@ -99,8 +100,9 @@ type ClusterSettings struct {
 }
 
 type MetricsSettings struct {
-	Enable        *bool
-	ListenAddress *string
+	Enable           *bool
+	BlockProfileRate *int
+	ListenAddress    *string
 }
 
 type SSOSettings struct {
@@ -224,6 +226,10 @@ type TeamSettings struct {
 	RestrictTeamInvite               *string
 	RestrictPublicChannelManagement  *string
 	RestrictPrivateChannelManagement *string
+	RestrictPublicChannelCreation    *string
+	RestrictPrivateChannelCreation   *string
+	RestrictPublicChannelDeletion    *string
+	RestrictPrivateChannelDeletion   *string
 	UserStatusAwayTimeout            *int64
 	MaxChannelsPerTeam               *int64
 	MaxNotificationsPerChannel       *int64
@@ -249,6 +255,7 @@ type LdapSettings struct {
 	UsernameAttribute  *string
 	NicknameAttribute  *string
 	IdAttribute        *string
+	PositionAttribute  *string
 
 	// Syncronization
 	SyncIntervalMinutes *int
@@ -295,6 +302,7 @@ type SamlSettings struct {
 	UsernameAttribute  *string
 	NicknameAttribute  *string
 	LocaleAttribute    *string
+	PositionAttribute  *string
 
 	LoginButtonText *string
 }
@@ -433,6 +441,11 @@ func (o *Config) SetDefaults() {
 		*o.ServiceSettings.EnableMultifactorAuthentication = false
 	}
 
+	if o.ServiceSettings.EnforceMultifactorAuthentication == nil {
+		o.ServiceSettings.EnforceMultifactorAuthentication = new(bool)
+		*o.ServiceSettings.EnforceMultifactorAuthentication = false
+	}
+
 	if o.PasswordSettings.MinimumLength == nil {
 		o.PasswordSettings.MinimumLength = new(int)
 		*o.PasswordSettings.MinimumLength = PASSWORD_MINIMUM_LENGTH
@@ -496,6 +509,30 @@ func (o *Config) SetDefaults() {
 	if o.TeamSettings.RestrictPrivateChannelManagement == nil {
 		o.TeamSettings.RestrictPrivateChannelManagement = new(string)
 		*o.TeamSettings.RestrictPrivateChannelManagement = PERMISSIONS_ALL
+	}
+
+	if o.TeamSettings.RestrictPublicChannelCreation == nil {
+		o.TeamSettings.RestrictPublicChannelCreation = new(string)
+		// If this setting does not exist, assume migration from <3.6, so use management setting as default.
+		*o.TeamSettings.RestrictPublicChannelCreation = *o.TeamSettings.RestrictPublicChannelManagement
+	}
+
+	if o.TeamSettings.RestrictPrivateChannelCreation == nil {
+		o.TeamSettings.RestrictPrivateChannelCreation = new(string)
+		// If this setting does not exist, assume migration from <3.6, so use management setting as default.
+		*o.TeamSettings.RestrictPrivateChannelCreation = *o.TeamSettings.RestrictPrivateChannelManagement
+	}
+
+	if o.TeamSettings.RestrictPublicChannelDeletion == nil {
+		o.TeamSettings.RestrictPublicChannelDeletion = new(string)
+		// If this setting does not exist, assume migration from <3.6, so use management setting as default.
+		*o.TeamSettings.RestrictPublicChannelDeletion = *o.TeamSettings.RestrictPublicChannelManagement
+	}
+
+	if o.TeamSettings.RestrictPrivateChannelDeletion == nil {
+		o.TeamSettings.RestrictPrivateChannelDeletion = new(string)
+		// If this setting does not exist, assume migration from <3.6, so use management setting as default.
+		*o.TeamSettings.RestrictPrivateChannelDeletion = *o.TeamSettings.RestrictPrivateChannelManagement
 	}
 
 	if o.TeamSettings.UserStatusAwayTimeout == nil {
@@ -681,6 +718,11 @@ func (o *Config) SetDefaults() {
 	if o.LdapSettings.IdAttribute == nil {
 		o.LdapSettings.IdAttribute = new(string)
 		*o.LdapSettings.IdAttribute = ""
+	}
+
+	if o.LdapSettings.PositionAttribute == nil {
+		o.LdapSettings.PositionAttribute = new(string)
+		*o.LdapSettings.PositionAttribute = ""
 	}
 
 	if o.LdapSettings.SyncIntervalMinutes == nil {
@@ -904,6 +946,11 @@ func (o *Config) SetDefaults() {
 		*o.SamlSettings.NicknameAttribute = ""
 	}
 
+	if o.SamlSettings.PositionAttribute == nil {
+		o.SamlSettings.PositionAttribute = new(string)
+		*o.SamlSettings.PositionAttribute = ""
+	}
+
 	if o.SamlSettings.LocaleAttribute == nil {
 		o.SamlSettings.LocaleAttribute = new(string)
 		*o.SamlSettings.LocaleAttribute = ""
@@ -972,6 +1019,11 @@ func (o *Config) SetDefaults() {
 	if o.ServiceSettings.Forward80To443 == nil {
 		o.ServiceSettings.Forward80To443 = new(bool)
 		*o.ServiceSettings.Forward80To443 = false
+	}
+
+	if o.MetricsSettings.BlockProfileRate == nil {
+		o.MetricsSettings.BlockProfileRate = new(int)
+		*o.MetricsSettings.BlockProfileRate = 0
 	}
 
 	o.defaultWebrtcSettings()

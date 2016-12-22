@@ -1,7 +1,7 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-import keyMirror from 'keymirror';
+import keyMirror from 'key-mirror/keyMirror.js';
 
 import audioIcon from 'images/icons/audio.png';
 import videoIcon from 'images/icons/video.png';
@@ -90,7 +90,7 @@ export const ActionTypes = keyMirror({
     RECEIVED_PROFILES_IN_TEAM: null,
     RECEIVED_PROFILE: null,
     RECEIVED_PROFILES_IN_CHANNEL: null,
-    RECEIVED_PROFILE_NOT_IN_CHANNEL: null,
+    RECEIVED_PROFILES_NOT_IN_CHANNEL: null,
     RECEIVED_ME: null,
     RECEIVED_SESSIONS: null,
     RECEIVED_AUDITS: null,
@@ -122,6 +122,10 @@ export const ActionTypes = keyMirror({
     UPDATED_CUSTOM_EMOJI: null,
     REMOVED_CUSTOM_EMOJI: null,
 
+    RECEIVED_REACTIONS: null,
+    ADDED_REACTION: null,
+    REMOVED_REACTION: null,
+
     RECEIVED_MSG: null,
 
     RECEIVED_MY_TEAM: null,
@@ -135,6 +139,7 @@ export const ActionTypes = keyMirror({
     RECEIVED_ALL_TEAMS: null,
     RECEIVED_ALL_TEAM_LISTINGS: null,
     RECEIVED_MY_TEAM_MEMBERS: null,
+    RECEIVED_MY_TEAMS_UNREAD: null,
     RECEIVED_MEMBERS_IN_TEAM: null,
     RECEIVED_TEAM_STATS: null,
 
@@ -198,6 +203,7 @@ export const SocketEvents = {
     DIRECT_ADDED: 'direct_added',
     NEW_USER: 'new_user',
     LEAVE_TEAM: 'leave_team',
+    UPDATE_TEAM: 'update_team',
     USER_ADDED: 'user_added',
     USER_REMOVED: 'user_removed',
     USER_UPDATED: 'user_updated',
@@ -206,7 +212,9 @@ export const SocketEvents = {
     EPHEMERAL_MESSAGE: 'ephemeral_message',
     STATUS_CHANGED: 'status_change',
     HELLO: 'hello',
-    WEBRTC: 'webrtc'
+    WEBRTC: 'webrtc',
+    REACTION_ADDED: 'reaction_added',
+    REACTION_REMOVED: 'reaction_removed'
 };
 
 export const TutorialSteps = {
@@ -258,7 +266,8 @@ export const Constants = {
         FULLNAME: 'fullname',
         NICKNAME: 'nickname',
         EMAIL: 'email',
-        LANGUAGE: 'language'
+        LANGUAGE: 'language',
+        POSITION: 'position'
     },
 
     ScrollTypes: {
@@ -823,11 +832,13 @@ export const Constants = {
     DEFAULT_MAX_CHANNELS_PER_TEAM: 2000,
     DEFAULT_MAX_NOTIFICATIONS_PER_CHANNEL: 1000,
     MAX_TEAMNAME_LENGTH: 15,
+    MAX_TEAMDESCRIPTION_LENGTH: 50,
     MIN_USERNAME_LENGTH: 3,
     MAX_USERNAME_LENGTH: 22,
     MAX_NICKNAME_LENGTH: 22,
     MIN_PASSWORD_LENGTH: 5,
     MAX_PASSWORD_LENGTH: 64,
+    MAX_POSITION_LENGTH: 35,
     MIN_TRIGGER_LENGTH: 1,
     MAX_TRIGGER_LENGTH: 128,
     MAX_TEXTSETTING_LENGTH: 1024,
@@ -854,7 +865,9 @@ export const Constants = {
     MENTION_SPECIAL: 'mention.special',
     DEFAULT_NOTIFICATION_DURATION: 5000,
     STATUS_INTERVAL: 60000,
-    AUTOCOMPLETE_TIMEOUT: 100
+    AUTOCOMPLETE_TIMEOUT: 100,
+    ANIMATION_TIMEOUT: 1000,
+    SEARCH_TIMEOUT_MILLISECONDS: 100
 };
 
 export default Constants;

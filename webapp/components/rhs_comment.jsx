@@ -6,6 +6,7 @@ import FileAttachmentListContainer from './file_attachment_list_container.jsx';
 import PendingPostOptions from 'components/post_view/components/pending_post_options.jsx';
 import PostMessageContainer from 'components/post_view/components/post_message_container.jsx';
 import ProfilePicture from 'components/profile_picture.jsx';
+import ReactionListContainer from 'components/post_view/components/reaction_list_container.jsx';
 import RhsDropdown from 'components/rhs_dropdown.jsx';
 
 import TeamStore from 'stores/team_store.jsx';
@@ -165,6 +166,29 @@ export default class RhsComment extends React.Component {
             </li>
         );
 
+        if (isOwner || isAdmin) {
+            dropdownContents.push(
+                <li
+                    role='presentation'
+                    key='delete-button'
+                >
+                    <a
+                        href='#'
+                        role='menuitem'
+                        onClick={(e) => {
+                            e.preventDefault();
+                            GlobalActions.showDeletePostModal(post, 0);
+                        }}
+                    >
+                        <FormattedMessage
+                            id='rhs_comment.del'
+                            defaultMessage='Delete'
+                        />
+                    </a>
+                </li>
+            );
+        }
+
         if (isOwner) {
             dropdownContents.push(
                 <li
@@ -191,29 +215,6 @@ export default class RhsComment extends React.Component {
             );
         }
 
-        if (isOwner || isAdmin) {
-            dropdownContents.push(
-                <li
-                    role='presentation'
-                    key='delete-button'
-                >
-                    <a
-                        href='#'
-                        role='menuitem'
-                        onClick={(e) => {
-                            e.preventDefault();
-                            GlobalActions.showDeletePostModal(post, 0);
-                        }}
-                    >
-                        <FormattedMessage
-                            id='rhs_comment.del'
-                            defaultMessage='Delete'
-                        />
-                    </a>
-                </li>
-            );
-        }
-
         if (dropdownContents.length === 0) {
             return '';
         }
@@ -226,6 +227,8 @@ export default class RhsComment extends React.Component {
     render() {
         const post = this.props.post;
         const flagIcon = Constants.FLAG_ICON_SVG;
+        const mattermostLogo = Constants.MATTERMOST_ICON_SVG;
+        const isSystemMessage = PostUtils.isSystemMessage(post);
 
         var currentUserCss = '';
         if (this.props.currentUser === post.user_id) {
@@ -235,10 +238,31 @@ export default class RhsComment extends React.Component {
         var timestamp = this.props.currentUser.update_at;
 
         let botIndicator;
-
+        let userProfile = (
+            <UserProfile user={this.props.user}/>
+        );
         if (post.props && post.props.from_webhook) {
+            if (post.props.override_username && global.window.mm_config.EnablePostUsernameOverride === 'true') {
+                userProfile = (
+                    <UserProfile
+                        user={this.props.user}
+                        overwriteName={post.props.override_username}
+                        disablePopover={true}
+                    />
+                );
+            }
             botIndicator = <li className='bot-indicator'>{Constants.BOT_NAME}</li>;
+        } else if (isSystemMessage) {
+            userProfile = (
+                <UserProfile
+                    user={{}}
+                    overwriteName={Constants.SYSTEM_MESSAGE_PROFILE_NAME}
+                    overwriteImage={Constants.SYSTEM_MESSAGE_PROFILE_IMAGE}
+                    disablePopover={true}
+                />
+            );
         }
+
         let loading;
         let postClass = '';
         let message = <PostMessageContainer post={post}/>;
@@ -263,15 +287,34 @@ export default class RhsComment extends React.Component {
             );
         }
 
+        let systemMessageClass = '';
+        if (isSystemMessage) {
+            systemMessageClass = 'post--system';
+        }
+
+        let status = this.props.status;
+        if (post.props && post.props.from_webhook === 'true') {
+            status = null;
+        }
+
         let profilePic = (
             <ProfilePicture
                 src={PostUtils.getProfilePicSrcForPost(post, timestamp)}
-                status={this.props.status}
+                status={status}
                 width='36'
                 height='36'
                 user={this.props.user}
             />
         );
+
+        if (isSystemMessage) {
+            profilePic = (
+                <span
+                    className='icon'
+                    dangerouslySetInnerHTML={{__html: mattermostLogo}}
+                />
+            );
+        }
 
         let compactClass = '';
         if (this.props.compactDisplay) {
@@ -280,7 +323,7 @@ export default class RhsComment extends React.Component {
             profilePic = (
                 <ProfilePicture
                     src=''
-                    status={this.props.status}
+                    status={status}
                     user={this.props.user}
                 />
             );
@@ -381,13 +424,13 @@ export default class RhsComment extends React.Component {
         };
 
         return (
-            <div className={'post post--thread ' + currentUserCss + ' ' + compactClass}>
+            <div className={'post post--thread ' + currentUserCss + ' ' + compactClass + ' ' + systemMessageClass}>
                 <div className='post__content'>
                     {profilePicContainer}
                     <div>
                         <ul className='post__header'>
                             <li className='col col__name'>
-                                <strong><UserProfile user={this.props.user}/></strong>
+                                <strong>{userProfile}</strong>
                             </li>
                             {botIndicator}
                             <li className='col'>
@@ -404,6 +447,10 @@ export default class RhsComment extends React.Component {
                                 {message}
                             </div>
                             {fileAttachment}
+                            <ReactionListContainer
+                                post={post}
+                                currentUserId={this.props.currentUser.id}
+                            />
                         </div>
                     </div>
                 </div>

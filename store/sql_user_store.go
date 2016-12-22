@@ -10,19 +10,26 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mattermost/platform/einterfaces"
 	"github.com/mattermost/platform/model"
 	"github.com/mattermost/platform/utils"
 )
 
 const (
-	MISSING_ACCOUNT_ERROR             = "store.sql_user.missing_account.const"
-	MISSING_AUTH_ACCOUNT_ERROR        = "store.sql_user.get_by_auth.missing_account.app_error"
-	PROFILES_IN_CHANNEL_CACHE_SIZE    = 5000
-	PROFILES_IN_CHANNEL_CACHE_SEC     = 900 // 15 mins
-	USER_SEARCH_OPTION_NAMES_ONLY     = "names_only"
-	USER_SEARCH_OPTION_ALLOW_INACTIVE = "allow_inactive"
-	USER_SEARCH_TYPE_NAMES            = "Username, FirstName, LastName, Nickname"
-	USER_SEARCH_TYPE_ALL              = "Username, FirstName, LastName, Nickname, Email"
+	MISSING_ACCOUNT_ERROR                      = "store.sql_user.missing_account.const"
+	MISSING_AUTH_ACCOUNT_ERROR                 = "store.sql_user.get_by_auth.missing_account.app_error"
+	PROFILES_IN_CHANNEL_CACHE_SIZE             = 5000
+	PROFILES_IN_CHANNEL_CACHE_SEC              = 900 // 15 mins
+	PROFILE_BY_IDS_CACHE_SIZE                  = 20000
+	PROFILE_BY_IDS_CACHE_SEC                   = 900 // 15 mins
+	USER_SEARCH_OPTION_NAMES_ONLY              = "names_only"
+	USER_SEARCH_OPTION_NAMES_ONLY_NO_FULL_NAME = "names_only_no_full_name"
+	USER_SEARCH_OPTION_ALL_NO_FULL_NAME        = "all_no_full_name"
+	USER_SEARCH_OPTION_ALLOW_INACTIVE          = "allow_inactive"
+	USER_SEARCH_TYPE_NAMES_NO_FULL_NAME        = "Username, Nickname"
+	USER_SEARCH_TYPE_NAMES                     = "Username, FirstName, LastName, Nickname"
+	USER_SEARCH_TYPE_ALL_NO_FULL_NAME          = "Username, Nickname, Email"
+	USER_SEARCH_TYPE_ALL                       = "Username, FirstName, LastName, Nickname, Email"
 )
 
 type SqlUserStore struct {
@@ -30,6 +37,16 @@ type SqlUserStore struct {
 }
 
 var profilesInChannelCache *utils.Cache = utils.NewLru(PROFILES_IN_CHANNEL_CACHE_SIZE)
+var profileByIdsCache *utils.Cache = utils.NewLru(PROFILE_BY_IDS_CACHE_SIZE)
+
+func ClearUserCaches() {
+	profilesInChannelCache.Purge()
+	profileByIdsCache.Purge()
+}
+
+func (us SqlUserStore) InvalidatProfileCacheForUser(userId string) {
+	profileByIdsCache.Remove(userId)
+}
 
 func NewSqlUserStore(sqlStore *SqlStore) UserStore {
 	us := &SqlUserStore{sqlStore}
@@ -50,6 +67,7 @@ func NewSqlUserStore(sqlStore *SqlStore) UserStore {
 		table.ColMap("NotifyProps").SetMaxSize(2000)
 		table.ColMap("Locale").SetMaxSize(5)
 		table.ColMap("MfaSecret").SetMaxSize(128)
+		table.ColMap("Position").SetMaxSize(64)
 	}
 
 	return us
@@ -62,7 +80,9 @@ func (us SqlUserStore) CreateIndexesIfNotExists() {
 	us.CreateIndexIfNotExists("idx_users_delete_at", "Users", "DeleteAt")
 
 	us.CreateFullTextIndexIfNotExists("idx_users_all_txt", "Users", USER_SEARCH_TYPE_ALL)
+	us.CreateFullTextIndexIfNotExists("idx_users_all_no_full_name_txt", "Users", USER_SEARCH_TYPE_ALL_NO_FULL_NAME)
 	us.CreateFullTextIndexIfNotExists("idx_users_names_txt", "Users", USER_SEARCH_TYPE_NAMES)
+	us.CreateFullTextIndexIfNotExists("idx_users_names_no_full_name_txt", "Users", USER_SEARCH_TYPE_NAMES_NO_FULL_NAME)
 }
 
 func (us SqlUserStore) Save(user *model.User) StoreChannel {
@@ -265,7 +285,7 @@ func (us SqlUserStore) UpdateFailedPasswordAttempts(userId string, attempts int)
 	return storeChannel
 }
 
-func (us SqlUserStore) UpdateAuthData(userId string, service string, authData *string, email string) StoreChannel {
+func (us SqlUserStore) UpdateAuthData(userId string, service string, authData *string, email string, resetMfa bool) StoreChannel {
 
 	storeChannel := make(StoreChannel, 1)
 
@@ -289,6 +309,10 @@ func (us SqlUserStore) UpdateAuthData(userId string, service string, authData *s
 
 		if len(email) != 0 {
 			query += ", Email = :Email"
+		}
+
+		if resetMfa {
+			query += ", MfaActive = false, MfaSecret = ''"
 		}
 
 		query += " WHERE Id = :UserId"
@@ -578,13 +602,25 @@ func (us SqlUserStore) GetProfilesInChannel(channelId string, offset int, limit 
 
 	go func() {
 		result := StoreResult{}
+		metrics := einterfaces.GetMetricsInterface()
 
 		if allowFromCache && offset == -1 && limit == -1 {
 			if cacheItem, ok := profilesInChannelCache.Get(channelId); ok {
+				if metrics != nil {
+					metrics.IncrementMemCacheHitCounter("Profiles in Channel")
+				}
 				result.Data = cacheItem.(map[string]*model.User)
 				storeChannel <- result
 				close(storeChannel)
 				return
+			} else {
+				if metrics != nil {
+					metrics.IncrementMemCacheMissCounter("Profiles in Channel")
+				}
+			}
+		} else {
+			if metrics != nil {
+				metrics.IncrementMemCacheMissCounter("Profiles in Channel")
 			}
 		}
 
@@ -762,7 +798,7 @@ func (us SqlUserStore) GetRecentlyActiveUsersForTeam(teamId string) StoreChannel
 	return storeChannel
 }
 
-func (us SqlUserStore) GetProfileByIds(userIds []string) StoreChannel {
+func (us SqlUserStore) GetProfileByIds(userIds []string, allowFromCache bool) StoreChannel {
 
 	storeChannel := make(StoreChannel, 1)
 
@@ -770,10 +806,33 @@ func (us SqlUserStore) GetProfileByIds(userIds []string) StoreChannel {
 		result := StoreResult{}
 
 		var users []*model.User
+		userMap := make(map[string]*model.User)
 		props := make(map[string]interface{})
 		idQuery := ""
+		remainingUserIds := make([]string, 0)
 
-		for index, userId := range userIds {
+		if allowFromCache {
+			for _, userId := range userIds {
+				if cacheItem, ok := profileByIdsCache.Get(userId); ok {
+					u := cacheItem.(*model.User)
+					userMap[u.Id] = u
+				} else {
+					remainingUserIds = append(remainingUserIds, userId)
+				}
+			}
+		} else {
+			remainingUserIds = userIds
+		}
+
+		// If everything came from the cache then just return
+		if len(remainingUserIds) == 0 {
+			result.Data = userMap
+			storeChannel <- result
+			close(storeChannel)
+			return
+		}
+
+		for index, userId := range remainingUserIds {
 			if len(idQuery) > 0 {
 				idQuery += ", "
 			}
@@ -786,13 +845,12 @@ func (us SqlUserStore) GetProfileByIds(userIds []string) StoreChannel {
 			result.Err = model.NewLocAppError("SqlUserStore.GetProfileByIds", "store.sql_user.get_profiles.app_error", nil, err.Error())
 		} else {
 
-			userMap := make(map[string]*model.User)
-
 			for _, u := range users {
 				u.Password = ""
 				u.AuthData = new(string)
 				*u.AuthData = ""
 				userMap[u.Id] = u
+				profileByIdsCache.AddWithExpiresInSecs(u.Id, u, PROFILE_BY_IDS_CACHE_SEC)
 			}
 
 			result.Data = userMap
@@ -1228,6 +1286,7 @@ var specialUserSearchChar = []string{
 	"@",
 	":",
 	"*",
+	"\"",
 }
 
 func (us SqlUserStore) performSearch(searchQuery string, term string, options map[string]bool, parameters map[string]interface{}) StoreResult {
@@ -1241,6 +1300,10 @@ func (us SqlUserStore) performSearch(searchQuery string, term string, options ma
 	searchType := USER_SEARCH_TYPE_ALL
 	if ok := options[USER_SEARCH_OPTION_NAMES_ONLY]; ok {
 		searchType = USER_SEARCH_TYPE_NAMES
+	} else if ok = options[USER_SEARCH_OPTION_NAMES_ONLY_NO_FULL_NAME]; ok {
+		searchType = USER_SEARCH_TYPE_NAMES_NO_FULL_NAME
+	} else if ok = options[USER_SEARCH_OPTION_ALL_NO_FULL_NAME]; ok {
+		searchType = USER_SEARCH_TYPE_ALL_NO_FULL_NAME
 	}
 
 	if ok := options[USER_SEARCH_OPTION_ALLOW_INACTIVE]; ok {

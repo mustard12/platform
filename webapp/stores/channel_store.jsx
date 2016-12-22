@@ -4,6 +4,8 @@
 import AppDispatcher from '../dispatcher/app_dispatcher.jsx';
 import EventEmitter from 'events';
 
+import TeamStore from 'stores/team_store.jsx';
+
 var Utils;
 import {ActionTypes, Constants} from 'utils/constants.jsx';
 const NotificationPrefs = Constants.NotificationPrefs;
@@ -213,6 +215,10 @@ class ChannelStoreClass extends EventEmitter {
         return this.channels;
     }
 
+    getChannelById(id) {
+        return this.channels.filter((c) => c.id === id)[0];
+    }
+
     storeMyChannelMember(channelMember) {
         const members = Object.assign({}, this.getMyMembers());
         members[channelMember.channel_id] = channelMember;
@@ -233,24 +239,25 @@ class ChannelStoreClass extends EventEmitter {
         return this.myChannelMembers;
     }
 
-    storeMoreChannels(channels) {
+    storeMoreChannels(channels, teamId = TeamStore.getCurrentId()) {
         const newChannels = {};
         for (let i = 0; i < channels.length; i++) {
             newChannels[channels[i].id] = channels[i];
         }
-        this.moreChannels = Object.assign({}, this.moreChannels, newChannels);
+        this.moreChannels[teamId] = Object.assign({}, this.moreChannels[teamId], newChannels);
     }
 
-    removeMoreChannel(channelId) {
-        Reflect.deleteProperty(this.moreChannels, channelId);
+    removeMoreChannel(channelId, teamId = TeamStore.getCurrentId()) {
+        Reflect.deleteProperty(this.moreChannels[teamId], channelId);
     }
 
-    getMoreChannels() {
-        return Object.assign({}, this.moreChannels);
+    getMoreChannels(teamId = TeamStore.getCurrentId()) {
+        return Object.assign({}, this.moreChannels[teamId]);
     }
 
-    getMoreChannelsList() {
-        return Object.keys(this.moreChannels).map((cid) => this.moreChannels[cid]);
+    getMoreChannelsList(teamId = TeamStore.getCurrentId()) {
+        const teamChannels = this.moreChannels[teamId] || {};
+        return Object.keys(teamChannels).map((cid) => teamChannels[cid]);
     }
 
     storeStats(stats) {
@@ -345,7 +352,6 @@ ChannelStore.dispatchToken = AppDispatcher.register((payload) => {
     switch (action.type) {
     case ActionTypes.CLICK_CHANNEL:
         ChannelStore.setCurrentId(action.id);
-        ChannelStore.resetCounts(action.id);
         ChannelStore.setPostMode(ChannelStore.POST_MODE_CHANNEL);
         ChannelStore.emitChange();
         break;

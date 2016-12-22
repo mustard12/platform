@@ -2,9 +2,12 @@
 // See License.txt for license information.
 
 import Client from './client.jsx';
-import TeamStore from '../stores/team_store.jsx';
-import BrowserStore from '../stores/browser_store.jsx';
+
+import TeamStore from 'stores/team_store.jsx';
+import BrowserStore from 'stores/browser_store.jsx';
+
 import * as GlobalActions from 'actions/global_actions.jsx';
+import {reconnect} from 'actions/websocket_actions.jsx';
 
 import request from 'superagent';
 
@@ -14,6 +17,7 @@ class WebClientClass extends Client {
     constructor() {
         super();
         this.enableLogErrorsToConsole(true);
+        this.hasInternetConnection = true;
         TeamStore.addChangeListener(this.onTeamStoreChanged.bind(this));
     }
 
@@ -34,8 +38,24 @@ class WebClientClass extends Client {
     }
 
     handleError(err, res) {
+        if (res && res.body && res.body.id === 'api.context.mfa_required.app_error') {
+            window.location.reload();
+            return;
+        }
+
         if (err.status === HTTP_UNAUTHORIZED && res.req.url !== '/api/v3/users/login') {
             GlobalActions.emitUserLoggedOutEvent('/login');
+        }
+
+        if (err.status == null) {
+            this.hasInternetConnection = false;
+        }
+    }
+
+    handleSuccess = (res) => { // eslint-disable-line no-unused-vars
+        if (res && !this.hasInternetConnection) {
+            reconnect();
+            this.hasInternetConnection = true;
         }
     }
 

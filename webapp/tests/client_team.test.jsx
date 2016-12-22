@@ -130,6 +130,20 @@ describe('Client.Team', function() {
         });
     });
 
+    it('getMyTeamMembers', function(done) {
+        TestHelper.initBasic(() => {
+            TestHelper.basicClient().getMyTeamMembers(
+                function(data) {
+                    assert.equal(data.length > 0, true);
+                    done();
+                },
+                function(err) {
+                    done(new Error(err.message));
+                }
+            );
+        });
+    });
+
     it('getTeamMembers', function(done) {
         TestHelper.initBasic(() => {
             TestHelper.basicClient().getTeamMembers(
@@ -237,6 +251,24 @@ describe('Client.Team', function() {
         });
     });
 
+    it('updateTeamDescription', function(done) {
+        TestHelper.initBasic(() => {
+            var team = TestHelper.basicTeam();
+            team.description = 'test_updated';
+
+            TestHelper.basicClient().updateTeam(
+                team,
+                function(data) {
+                    assert.equal(data.description, 'test_updated');
+                    done();
+                },
+                function(err) {
+                    done(new Error(err.message));
+                }
+            );
+        });
+    });
+
     it('addUserToTeam', function(done) {
         TestHelper.initBasic(() => {
             TestHelper.basicClient().createUser(
@@ -302,6 +334,22 @@ describe('Client.Team', function() {
                 user.id,
                 '',
                 function() {
+                    done();
+                },
+                function(err) {
+                    done(new Error(err.message));
+                }
+            );
+        });
+    });
+
+    it('getTeamByName', function(done) {
+        TestHelper.initBasic(() => {
+            TestHelper.basicClient().getTeamByName(
+                TestHelper.basicTeam().name,
+                function(data) {
+                    console.log(data);
+                    assert.equal(data.name, TestHelper.basicTeam().name);
                     done();
                 },
                 function(err) {

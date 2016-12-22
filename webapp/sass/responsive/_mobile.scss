@@ -5,23 +5,6 @@
         max-height: 145px;
     }
 
-    .modal {
-        .modal-dialog {
-            &.new-channel__modal {
-                position: fixed;
-                @include translate3d(0, 100%, 0);
-            }
-        }
-
-        &.in {
-            .modal-dialog {
-                &.new-channel__modal {
-                    @include translate3d(0, 0, 0);
-                }
-            }
-        }
-    }
-
     .webrtc__notification--rhs {
         left: auto;
         right: 0;
@@ -43,7 +26,7 @@
         @include box-shadow(none);
         background: alpha-color($black, .8);
         border: none;
-        height: calc(100% - 45px);
+        height: calc(100% - 40px);
         max-width: 100%;
         position: fixed;
         top: 47px;
@@ -61,6 +44,14 @@
             color: $white;
             font-size: 15px;
             padding: 15px 20px 100px;
+
+            > div {
+                &:first-child {
+                    -webkit-overflow-scrolling: touch;
+                    height: calc(100vh - 150px);
+                    overflow: auto;
+                }
+            }
         }
 
         .close {
@@ -86,7 +77,6 @@
 
     .app__body {
         .edit-modal-body {
-
             .custom-textarea {
                 max-height: 30vh;
             }
@@ -158,16 +148,6 @@
                 padding-left: 15px;
             }
         }
-    }
-
-    .member-select__container {
-        margin-bottom: 10px;
-        margin-top: 10px;
-        overflow: hidden;
-        position: relative;
-        right: 10px;
-        top: 0;
-        width: 100%;
     }
 
     .user-popover {
@@ -391,13 +371,6 @@
         width: 200px;
     }
 
-    .textarea-wrapper {
-        .textbox-preview-link,
-        .textbox-help-link {
-            display: none;
-        }
-    }
-
     .form-control {
         &.min-height {
             min-height: 100px;
@@ -601,6 +574,16 @@
             .settings-modal {
                 .modal-body {
                     min-height: 100%;
+                }
+
+                .nav-pills {
+                    > li {
+                        &:hover {
+                            a {
+                                background: transparent !important;
+                            }
+                        }
+                    }
                 }
 
                 &.display--content {
@@ -807,7 +790,7 @@
                 @include translate3d(0, 100%, 0);
                 background: alpha-color($black, .9);
                 display: block;
-                height: calc(100% - 45px);
+                height: calc(100% - 40px);
                 left: 0;
                 overflow: auto;
                 padding: 1.4em 0 0;
@@ -985,6 +968,10 @@
             bottom: 10px;
         }
 
+        .nav-pills__unread-indicator {
+            width: 260px;
+        }
+
         .badge {
             top: 13px;
         }
@@ -1016,11 +1003,11 @@
                     padding-bottom: 25px;
 
                     ul {
-                        clear: both;
-                        background: #ffffff;
+                        background: $white;
                         border-radius: 3px;
-                        top: 5px;
+                        clear: both;
                         position: relative;
+                        top: 5px;
 
                         li {
                             a {
@@ -1036,21 +1023,21 @@
 
                 > a {
                     font-size: 15px;
-                    margin: 0;
                     line-height: 2.5;
+                    margin: 0;
 
                     &:hover,
                     &:focus {
-                        background: transparent;
+                        background: transparent !important;
                     }
 
                     &.has-close {
                         .btn-close {
-                            width: 40px;
-                            text-align: center;
-                            right: 0;
-                            display: block;
                             @include opacity(.5);
+                            display: block;
+                            right: 0;
+                            text-align: center;
+                            width: 40px;
                         }
                     }
                 }
@@ -1176,10 +1163,51 @@
     .post-comments {
         padding: 9px 21px 10px 10px !important;
     }
+
+    .multi-teams {
+
+        .app__content {
+            margin-left: 0;
+        }
+
+        .sidebar--left {
+            left: 0;
+
+            &.move--right {
+                left: 65px;
+            }
+
+            .nav-pills__unread-indicator {
+                left: 15px;
+            }
+        }
+
+        .team-sidebar {
+            display: none;
+
+            &.move--right {
+                display: block;
+                @include translate3d(0, 0, 0);
+            }
+        }
+    }
 }
 
 @media screen and (max-width: 640px) {
     .app__body {
+        .modal {
+            .more-modal {
+                .modal-body {
+                    max-height: calc(100vh - 62px);
+                    padding-bottom: 5px;
+                }
+
+                .more-modal__list {
+                    max-height: calc(100vh - 230px);
+                }
+            }
+        }
+
         .post {
             .open {
                 > .dropdown-menu__content {
@@ -1334,6 +1362,37 @@
     }
 }
 
+@media screen and (max-width: 550px) {
+    .app__body {
+        .more-modal {
+            .filter-row {
+                width: 100%;
+            }
+
+            &.more-direct-channels {
+                .filter-row {
+                    padding-bottom: 50px;
+                }
+
+                .member-show {
+                    display: none;
+                }
+
+                select {
+                    margin: 0;
+                    width: 100%;
+                }
+            }
+        }
+    }
+
+    .member-select__container {
+        left: 15px;
+        top: 60px;
+        width: calc(100% - 30px);
+    }
+}
+
 @media screen and (max-width: 480px) {
     .sidebar--right {
         .post {
@@ -1371,22 +1430,6 @@
     }
 
     .app__body {
-        .more-modal {
-            .modal-body {
-                padding-bottom: 5px;
-            }
-
-            .more-modal__list {
-                max-height: calc(100vh - 260px);
-            }
-
-            &.more-direct-channels {
-                .more-modal__list {
-                    max-height: calc(100vh - 295px);
-                }
-            }
-        }
-
         .modal {
             &.more-channel__modal {
                 .more-modal__list {
@@ -1449,6 +1492,10 @@
     .sidebar--left {
         @include translate3d(-260px, 0, 0);
         width: 260px;
+
+        .nav-pills__unread-indicator {
+            width: 230px;
+        }
     }
 
     .inner-wrap {
@@ -1474,6 +1521,16 @@
 }
 
 @media screen and (max-width: 320px) {
+    .multi-teams {
+        .sidebar--left {
+            width: 220px;
+
+            .nav-pills__unread-indicator {
+                width: 190px;
+            }
+        }
+    }
+
     .post {
         .post__header {
             .col__name {

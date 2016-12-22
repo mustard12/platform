@@ -103,8 +103,28 @@ func PublishSkipClusterSend(message *model.WebSocketEvent) {
 }
 
 func InvalidateCacheForChannel(channelId string) {
+	InvalidateCacheForChannelSkipClusterSend(channelId)
+
+	if cluster := einterfaces.GetClusterInterface(); cluster != nil {
+		cluster.InvalidateCacheForChannel(channelId)
+	}
+}
+
+func InvalidateCacheForChannelSkipClusterSend(channelId string) {
 	Srv.Store.User().InvalidateProfilesInChannelCache(channelId)
 	Srv.Store.Channel().InvalidateMemberCount(channelId)
+}
+
+func InvalidateCacheForChannelPosts(channelId string) {
+	InvalidateCacheForChannelPostsSkipClusterSend(channelId)
+
+	if cluster := einterfaces.GetClusterInterface(); cluster != nil {
+		cluster.InvalidateCacheForChannelPosts(channelId)
+	}
+}
+
+func InvalidateCacheForChannelPostsSkipClusterSend(channelId string) {
+	Srv.Store.Post().InvalidateLastPostTimeCache(channelId)
 }
 
 func InvalidateCacheForUser(userId string) {
@@ -118,8 +138,11 @@ func InvalidateCacheForUser(userId string) {
 func InvalidateCacheForUserSkipClusterSend(userId string) {
 	Srv.Store.Channel().InvalidateAllChannelMembersForUser(userId)
 	Srv.Store.User().InvalidateProfilesInChannelCacheByUser(userId)
+	Srv.Store.User().InvalidatProfileCacheForUser(userId)
 
-	GetHubForUserId(userId).InvalidateUser(userId)
+	if len(hubs) != 0 {
+		GetHubForUserId(userId).InvalidateUser(userId)
+	}
 }
 
 func (h *Hub) Register(webConn *WebConn) {

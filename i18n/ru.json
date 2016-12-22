@@ -441,11 +441,11 @@
   },
   {
     "id": "api.command.team_mismatch.app_error",
-    "translation": "Cannot update commands across teams"
+    "translation": "Невозможно обновить команды через команды"
   },
   {
     "id": "api.command.update.app_error",
-    "translation": "Несоответствующие права для команды удаления"
+    "translation": "Несоответствующие права для обновления команды"
   },
   {
     "id": "api.command_away.desc",
@@ -466,6 +466,10 @@
   {
     "id": "api.command_collapse.name",
     "translation": "cвернуть"
+  },
+  {
+    "id": "api.command_collapse.success",
+    "translation": "Image links now collapse by default"
   },
   {
     "id": "api.command_echo.create.app_error",
@@ -498,6 +502,10 @@
   {
     "id": "api.command_expand.name",
     "translation": "расширить"
+  },
+  {
+    "id": "api.command_expand.success",
+    "translation": "Image links now expand by default"
   },
   {
     "id": "api.command_expand_collapse.fail.app_error",
@@ -684,12 +692,20 @@
     "translation": "Неверный токен сессии %v, ошибка=%v"
   },
   {
+    "id": "api.context.invalidate_all_caches",
+    "translation": "Очистка всех кэшей"
+  },
+  {
     "id": "api.context.last_activity_at.error",
     "translation": "Сбой при обновлении времени последней активности для user_id=%v и session_id=%v, ошибка=%v"
   },
   {
     "id": "api.context.log.error",
     "translation": "%v:%v code=%v rid=%v uid=%v ip=%v %v [details: %v]"
+  },
+  {
+    "id": "api.context.mfa_required.app_error",
+    "translation": "Multi-factor authentication is required on this server."
   },
   {
     "id": "api.context.permissions.app_error",
@@ -791,7 +807,11 @@
   },
   {
     "id": "api.emoji.create.too_large.app_error",
-    "translation": "Не удалось создать смайлик. Размер изображения должен быть меньше 64KB."
+    "translation": "Невозможно создать смайлик. Изображение должно быть не более 1 Мб."
+  },
+  {
+    "id": "api.emoji.delete.delete_reactions.app_error",
+    "translation": "Unable to delete reactions when deleting emoji with emoji name %v"
   },
   {
     "id": "api.emoji.delete.permissions.app_error",
@@ -822,8 +842,20 @@
     "translation": "Не удалось создать эмодзи. Должен быть PNG, JPEG или GIF файл."
   },
   {
-    "id": "api.emoji.upload.large_image.app_error",
-    "translation": "Не удалось создать эмодзи. Изображение должно быть не больше 128 на 128 пикселей."
+    "id": "api.emoji.upload.large_image.decode_error",
+    "translation": "Невозможно создать смайлик. Произошла ошибка при декодировании изображения."
+  },
+  {
+    "id": "api.emoji.upload.large_image.encode_error",
+    "translation": "Невозможно создать смайлик. Произошла ошибка при кодировании изображения."
+  },
+  {
+    "id": "api.emoji.upload.large_image.gif_decode_error",
+    "translation": "Невозможно создать смайлик. Произошла ошибка при декодировании GIF изображения."
+  },
+  {
+    "id": "api.emoji.upload.large_image.gif_encode_error",
+    "translation": "Невозможно создать смайлик. Произошла ошибка при кодирования GIF изображения."
   },
   {
     "id": "api.file.get_file.public_disabled.app_error",
@@ -991,7 +1023,7 @@
   },
   {
     "id": "api.file.upload_file.large_image.app_error",
-    "translation": "File above maximum dimensions could not be uploaded: {{.Filename}}"
+    "translation": "Размер файла превышает максимальный размер и не может быть загружен: {{.Filename}}"
   },
   {
     "id": "api.file.upload_file.storage.app_error",
@@ -1274,6 +1306,18 @@
     "translation": "Возникла ошибка при удалении файлов из сообщения, post_id=%v, err=%v"
   },
   {
+    "id": "api.post.disabled_all",
+    "translation": "Упоминание @all было отключено, поскольку количество пользователей на канале превышает {{.Users}}."
+  },
+  {
+    "id": "api.post.disabled_channel",
+    "translation": "@channel был отключен, поскольку количество пользователей превышает {{.Users}}."
+  },
+  {
+    "id": "api.post.disabled_here",
+    "translation": "Упоминание @here было отключено, поскольку количество пользователей на канале превышает {{.Users}}."
+  },
+  {
     "id": "api.post.get_message_for_notification.files_sent",
     "translation": {
       "one": "{{.Count}} файл отправлен: {{.Filenames}}{{.Count}} файлов отправлено: {{.Filenames}}",
@@ -1480,6 +1524,22 @@
     "translation": "session.user_id={{.SessionUserId}}, preference.user_id={{.PreferenceUserId}}"
   },
   {
+    "id": "api.reaction.delete_reaction.mismatched_channel_id.app_error",
+    "translation": "Failed to delete reaction when channel id in URL doesn't match post id in URL"
+  },
+  {
+    "id": "api.reaction.list_reactions.mismatched_channel_id.app_error",
+    "translation": "Failed to get reactions when channel id in URL doesn't match post id in URL"
+  },
+  {
+    "id": "api.reaction.save_reaction.mismatched_channel_id.app_error",
+    "translation": "Failed to save reaction when channel id in URL doesn't match post id in URL"
+  },
+  {
+    "id": "api.reaction.send_reaction_event.post.app_error",
+    "translation": "Failed to get post when sending websocket event for reaction"
+  },
+  {
     "id": "api.saml.save_certificate.app_error",
     "translation": "Сертификат не сохранен корректно."
   },
@@ -1620,6 +1680,10 @@
     "translation": "Пользователь был слит с существующей учетной записью: {{.Email}}, {{.Username}}\r\n"
   },
   {
+    "id": "api.slackimport.slack_add_users.merge_existing_failed",
+    "translation": "Tried to merge user with existing account: {{.Email}}, {{.Username}}, but failed to add the user to this team.\r\n"
+  },
+  {
     "id": "api.slackimport.slack_add_users.unable_import",
     "translation": "Невозможно импортировать пользователя: {{.Username}}\r\n"
   },
@@ -1693,7 +1757,7 @@
   },
   {
     "id": "api.slackimport.slack_sanitise_channel_properties.purpose_too_long.warn",
-    "translation": "Менеджер импорта Slack: Канал {{.ChannelName}} имеет слишком длинное имя. Оно будет укорочено при импорте."
+    "translation": "Менеджер импорта Slack: Канал {{.ChannelName}} имеет слишком длинное описание. Оно будет укорочено при импорте."
   },
   {
     "id": "api.status.init.debug",
@@ -1914,6 +1978,26 @@
   {
     "id": "api.templates.invite_subject",
     "translation": "{{ .SenderName }} приглашает Вас присоединиться к команде {{ .TeamDisplayName }} на {{.SiteName}}"
+  },
+  {
+    "id": "api.templates.mfa_activated_body.info",
+    "translation": "Multi-factor authentication has been added to your account on {{ .SiteURL }}.<br>If this change wasn't initiated by you, please contact your system administrator."
+  },
+  {
+    "id": "api.templates.mfa_activated_body.title",
+    "translation": "Multi-factor authentication was added"
+  },
+  {
+    "id": "api.templates.mfa_change_subject",
+    "translation": "Your MFA has been updated on {{ .SiteName }}"
+  },
+  {
+    "id": "api.templates.mfa_deactivated_body.info",
+    "translation": "Multi-factor authentication has been removed from your account on {{ .SiteURL }}.<br>If this change wasn't initiated by you, please contact your system administrator."
+  },
+  {
+    "id": "api.templates.mfa_deactivated_body.title",
+    "translation": "Multi-factor authentication was removed"
   },
   {
     "id": "api.templates.password_change_body.info",
@@ -2681,7 +2765,7 @@
   },
   {
     "id": "ent.ldap.create_fail",
-    "translation": "Unable to create LDAP user."
+    "translation": "Невозможно создать пользователя LDAP."
   },
   {
     "id": "ent.ldap.disabled.app_error",
@@ -2738,6 +2822,14 @@
   {
     "id": "ent.ldap.validate_filter.app_error",
     "translation": "Неверный фильтр AD/LDAP"
+  },
+  {
+    "id": "ent.metrics.starting.info",
+    "translation": "Metrics and profiling server is listening on %v"
+  },
+  {
+    "id": "ent.metrics.stopping.info",
+    "translation": "Metrics and profiling server is stopping on %v"
   },
   {
     "id": "ent.mfa.activate.authenticate.app_error",
@@ -3316,6 +3408,10 @@
     "translation": "Неверный максимальный размер файла в настройках файлов. Число должно быть неотрицательным."
   },
   {
+    "id": "model.config.is_valid.max_notify_per_channel.app_error",
+    "translation": "Неверное максимальное количество пользователей на команду. Число должно быть положительным."
+  },
+  {
     "id": "model.config.is_valid.max_users.app_error",
     "translation": "Неверное максимальное количество пользователей на команду в настройках команд. Число должно быть положительным."
   },
@@ -3668,6 +3764,22 @@
     "translation": "Слишком длинное значение"
   },
   {
+    "id": "model.reaction.is_valid.create_at.app_error",
+    "translation": "\"Создать в\" должно быть корректным временем"
+  },
+  {
+    "id": "model.reaction.is_valid.emoji_name.app_error",
+    "translation": "Недопустимое название эмодзи"
+  },
+  {
+    "id": "model.reaction.is_valid.post_id.app_error",
+    "translation": "Неверный идентификатор сообщения"
+  },
+  {
+    "id": "model.reaction.is_valid.user_id.app_error",
+    "translation": "Неверный идентификатор пользователя"
+  },
+  {
     "id": "model.team.is_valid.characters.app_error",
     "translation": "Имя должно состоять из 2 или более строчных букв и цифр"
   },
@@ -3678,6 +3790,10 @@
   {
     "id": "model.team.is_valid.create_at.app_error",
     "translation": "\"Создано в\" должно быть корректным временем"
+  },
+  {
+    "id": "model.team.is_valid.description.app_error",
+    "translation": "Неверное описание"
   },
   {
     "id": "model.team.is_valid.domains.app_error",
@@ -4168,6 +4284,10 @@
     "translation": "Не удалось сохранить участника канала"
   },
   {
+    "id": "store.sql_channel.search.app_error",
+    "translation": "Возникла проблема при поиске канала"
+  },
+  {
     "id": "store.sql_channel.set_last_viewed_at.app_error",
     "translation": "Не удалось установить время последнего просмотра на"
   },
@@ -4530,6 +4650,46 @@
   {
     "id": "store.sql_preference.update.app_error",
     "translation": "Не удалось обновить настройку"
+  },
+  {
+    "id": "store.sql_reaction.delete.begin.app_error",
+    "translation": "Unable to open transaction while deleting reaction"
+  },
+  {
+    "id": "store.sql_reaction.delete.commit.app_error",
+    "translation": "Unable to commit transaction while deleting reaction"
+  },
+  {
+    "id": "store.sql_reaction.delete.save.app_error",
+    "translation": "Unable to delete reaction"
+  },
+  {
+    "id": "store.sql_reaction.delete_all_with_emoj_name.delete_reactions.app_error",
+    "translation": "Unable to delete reactions with the given emoji name"
+  },
+  {
+    "id": "store.sql_reaction.delete_all_with_emoj_name.get_reactions.app_error",
+    "translation": "Unable to get reactions with the given emoji name"
+  },
+  {
+    "id": "store.sql_reaction.delete_all_with_emoji_name.update_post.warn",
+    "translation": "Unable to update Post.HasReactions while removing reactions post_id=%v, error=%v"
+  },
+  {
+    "id": "store.sql_reaction.get_for_post.app_error",
+    "translation": "Unable to get reactions for post"
+  },
+  {
+    "id": "store.sql_reaction.save.begin.app_error",
+    "translation": "Unable to open transaction while saving reaction"
+  },
+  {
+    "id": "store.sql_reaction.save.commit.app_error",
+    "translation": "Unable to commit transaction while saving reaction"
+  },
+  {
+    "id": "store.sql_reaction.save.save.app_error",
+    "translation": "Unable to save reaction"
   },
   {
     "id": "store.sql_session.analytics_session_count.app_error",

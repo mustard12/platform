@@ -11,6 +11,7 @@ import BrowserStore from 'stores/browser_store.jsx';
 import ErrorStore from 'stores/error_store.jsx';
 import NotificationStore from 'stores/notification_store.jsx'; //eslint-disable-line no-unused-vars
 
+import AppDispatcher from 'dispatcher/app_dispatcher.jsx';
 import Client from 'client/web_client.jsx';
 import WebSocketClient from 'client/web_websocket_client.jsx';
 import * as WebrtcActions from './webrtc_actions.jsx';
@@ -23,7 +24,7 @@ import {loadProfilesAndTeamMembersForDMSidebar} from 'actions/user_actions.jsx';
 import {loadChannelsForCurrentUser} from 'actions/channel_actions.jsx';
 import * as StatusActions from 'actions/status_actions.jsx';
 
-import {Constants, SocketEvents, UserStatuses} from 'utils/constants.jsx';
+import {ActionTypes, Constants, SocketEvents, UserStatuses} from 'utils/constants.jsx';
 
 import {browserHistory} from 'react-router/es6';
 
@@ -67,12 +68,13 @@ export function close() {
     WebSocketClient.close();
 }
 
-export function getStatuses() {
-    StatusActions.loadStatusesForChannelAndSidebar();
+export function reconnect() {
+    close();
+    initialize();
+    handleReconnect();
 }
 
 function handleFirstConnect() {
-    getStatuses();
     ErrorStore.clearLastError();
     ErrorStore.emitChange();
 }
@@ -83,7 +85,7 @@ function handleReconnect() {
         loadPosts(ChannelStore.getCurrentId());
     }
 
-    getStatuses();
+    StatusActions.loadStatusesForChannelAndSidebar();
     ErrorStore.clearLastError();
     ErrorStore.emitChange();
 }
@@ -118,6 +120,10 @@ function handleEvent(msg) {
 
     case SocketEvents.LEAVE_TEAM:
         handleLeaveTeamEvent(msg);
+        break;
+
+    case SocketEvents.UPDATE_TEAM:
+        handleUpdateTeamEvent(msg);
         break;
 
     case SocketEvents.USER_ADDED:
@@ -164,6 +170,14 @@ function handleEvent(msg) {
         handleWebrtc(msg);
         break;
 
+    case SocketEvents.REACTION_ADDED:
+        handleReactionAddedEvent(msg);
+        break;
+
+    case SocketEvents.REACTION_REMOVED:
+        handleReactionRemovedEvent(msg);
+        break;
+
     default:
     }
 }
@@ -190,7 +204,7 @@ function handlePostEditEvent(msg) {
     // Update channel state
     if (ChannelStore.getCurrentId() === msg.broadcast.channel_id) {
         if (window.isActive) {
-            AsyncClient.updateLastViewedAt(null, false);
+            AsyncClient.viewChannel();
         }
     }
 }
@@ -219,19 +233,31 @@ function handleNewUserEvent(msg) {
     AsyncClient.getUser(msg.data.user_id);
     AsyncClient.getChannelStats();
     loadProfilesAndTeamMembersForDMSidebar();
+
+    if (msg.data.user_id === UserStore.getCurrentId()) {
+        AsyncClient.getMyTeamMembers();
+    }
 }
 
 function handleLeaveTeamEvent(msg) {
     if (UserStore.getCurrentId() === msg.data.user_id) {
         TeamStore.removeMyTeamMember(msg.data.team_id);
 
-        // if they are on the team being removed redirect them to the root
+        // if they are on the team being removed redirect them to default team
         if (TeamStore.getCurrentId() === msg.data.team_id) {
             TeamStore.setCurrentId('');
             Client.setTeamId('');
-            browserHistory.push('/');
+            BrowserStore.removeGlobalItem(msg.data.team_id);
+            GlobalActions.redirectUserToDefaultTeam();
         }
+    } else {
+        UserStore.removeProfileFromTeam(msg.data.team_id, msg.data.user_id);
+        TeamStore.removeMemberInTeam(msg.data.team_id, msg.data.user_id);
     }
+}
+
+function handleUpdateTeamEvent(msg) {
+    TeamStore.updateTeam(msg.data.team);
 }
 
 function handleDirectAddedEvent(msg) {
@@ -318,4 +344,24 @@ function handleHelloEvent(msg) {
 function handleWebrtc(msg) {
     const data = msg.data;
     return WebrtcActions.handle(data);
+}
+
+function handleReactionAddedEvent(msg) {
+    const reaction = JSON.parse(msg.data.reaction);
+
+    AppDispatcher.handleServerAction({
+        type: ActionTypes.ADDED_REACTION,
+        postId: reaction.post_id,
+        reaction
+    });
+}
+
+function handleReactionRemovedEvent(msg) {
+    const reaction = JSON.parse(msg.data.reaction);
+
+    AppDispatcher.handleServerAction({
+        type: ActionTypes.REMOVED_REACTION,
+        postId: reaction.post_id,
+        reaction
+    });
 }

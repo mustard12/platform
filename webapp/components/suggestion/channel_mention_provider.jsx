@@ -2,6 +2,7 @@
 // See License.txt for license information.
 
 import Suggestion from './suggestion.jsx';
+import Provider from './provider.jsx';
 
 import {autocompleteChannels} from 'actions/channel_actions.jsx';
 
@@ -49,70 +50,61 @@ class ChannelMentionSuggestion extends Suggestion {
     }
 }
 
-export default class ChannelMentionProvider {
-    constructor() {
-        this.timeoutId = '';
-    }
-
-    componentWillUnmount() {
-        clearTimeout(this.timeoutId);
-    }
-
+export default class ChannelMentionProvider extends Provider {
     handlePretextChanged(suggestionId, pretext) {
         const captured = (/(^|\s)(~([^~]*))$/i).exec(pretext.toLowerCase());
         if (captured) {
             const prefix = captured[3];
 
-            function autocomplete() {
-                autocompleteChannels(
-                    prefix,
-                    (data) => {
-                        const channels = data;
+            this.startNewRequest(prefix);
 
-                        // Wrap channels in an outer object to avoid overwriting the 'type' property.
-                        const wrappedChannels = [];
-                        const wrappedMoreChannels = [];
-                        const moreChannels = [];
-                        channels.forEach((item) => {
-                            if (ChannelStore.get(item.id)) {
-                                wrappedChannels.push({
-                                    type: Constants.MENTION_CHANNELS,
-                                    channel: item
-                                });
-                                return;
-                            }
+            autocompleteChannels(
+                prefix,
+                (data) => {
+                    if (this.shouldCancelDispatch(prefix)) {
+                        return;
+                    }
 
-                            wrappedMoreChannels.push({
-                                type: Constants.MENTION_MORE_CHANNELS,
+                    const channels = data;
+
+                    // Wrap channels in an outer object to avoid overwriting the 'type' property.
+                    const wrappedChannels = [];
+                    const wrappedMoreChannels = [];
+                    const moreChannels = [];
+                    channels.forEach((item) => {
+                        if (ChannelStore.get(item.id)) {
+                            wrappedChannels.push({
+                                type: Constants.MENTION_CHANNELS,
                                 channel: item
                             });
+                            return;
+                        }
 
-                            moreChannels.push(item);
+                        wrappedMoreChannels.push({
+                            type: Constants.MENTION_MORE_CHANNELS,
+                            channel: item
                         });
 
-                        const wrapped = wrappedChannels.concat(wrappedMoreChannels);
-                        const mentions = wrapped.map((item) => '~' + item.channel.name);
+                        moreChannels.push(item);
+                    });
 
-                        AppDispatcher.handleServerAction({
-                            type: ActionTypes.RECEIVED_MORE_CHANNELS,
-                            channels: moreChannels
-                        });
+                    const wrapped = wrappedChannels.concat(wrappedMoreChannels);
+                    const mentions = wrapped.map((item) => '~' + item.channel.name);
 
-                        AppDispatcher.handleServerAction({
-                            type: ActionTypes.SUGGESTION_RECEIVED_SUGGESTIONS,
-                            id: suggestionId,
-                            matchedPretext: captured[2],
-                            terms: mentions,
-                            items: wrapped,
-                            component: ChannelMentionSuggestion
-                        });
-                    }
-                );
-            }
+                    AppDispatcher.handleServerAction({
+                        type: ActionTypes.RECEIVED_MORE_CHANNELS,
+                        channels: moreChannels
+                    });
 
-            this.timeoutId = setTimeout(
-                autocomplete.bind(this),
-                Constants.AUTOCOMPLETE_TIMEOUT
+                    AppDispatcher.handleServerAction({
+                        type: ActionTypes.SUGGESTION_RECEIVED_SUGGESTIONS,
+                        id: suggestionId,
+                        matchedPretext: captured[2],
+                        terms: mentions,
+                        items: wrapped,
+                        component: ChannelMentionSuggestion
+                    });
+                }
             );
         }
     }

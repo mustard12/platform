@@ -306,6 +306,7 @@ describe('Client.User', function() {
             TestHelper.basicClient().emailToOAuth(
                 user.email,
                 'new_password',
+                '',
                 'gitlab',
                 function() {
                     throw Error('shouldnt work');
@@ -345,6 +346,7 @@ describe('Client.User', function() {
             TestHelper.basicClient().emailToLdap(
                 user.email,
                 user.password,
+                '',
                 'unknown_id',
                 'unknown_pwd',
                 function() {
@@ -365,6 +367,7 @@ describe('Client.User', function() {
             TestHelper.basicClient().ldapToEmail(
                 user.email,
                 'new_password',
+                '',
                 'new_password',
                 function() {
                     throw Error('shouldnt work');
@@ -590,6 +593,21 @@ describe('Client.User', function() {
     it('autocompleteUsersInTeam', function(done) {
         TestHelper.initBasic(() => {
             TestHelper.basicClient().autocompleteUsersInTeam(
+                'uid',
+                function(data) {
+                    assert.equal(data != null, true);
+                    done();
+                },
+                function(err) {
+                    done(new Error(err.message));
+                }
+            );
+        });
+    });
+
+    it('autocompleteUsers', function(done) {
+        TestHelper.initBasic(() => {
+            TestHelper.basicClient().autocompleteUsers(
                 'uid',
                 function(data) {
                     assert.equal(data != null, true);

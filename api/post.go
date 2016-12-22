@@ -166,6 +166,8 @@ func CreatePost(c *Context, post *model.Post, triggerWebhooks bool) (*model.Post
 		}
 	}
 
+	InvalidateCacheForChannelPosts(rpost.ChannelId)
+
 	handlePostEvents(c, rpost, triggerWebhooks)
 
 	return rpost, nil
@@ -459,6 +461,9 @@ func getMentionKeywordsInChannel(profiles map[string]*model.User) map[string][]s
 	keywords := make(map[string][]string)
 
 	for id, profile := range profiles {
+		userMention := "@" + strings.ToLower(profile.Username)
+		keywords[userMention] = append(keywords[userMention], id)
+
 		if len(profile.NotifyProps["mention_keys"]) > 0 {
 			// Add all the user's mention keys
 			splitKeys := strings.Split(profile.NotifyProps["mention_keys"], ",")
@@ -600,6 +605,9 @@ func sendNotifications(c *Context, post *model.Post, team *model.Team, channel *
 		}
 
 		mentionedUserIds[otherUserId] = true
+		if post.Props["from_webhook"] == "true" {
+			mentionedUserIds[post.UserId] = true
+		}
 	} else {
 		keywords := getMentionKeywordsInChannel(profileMap)
 
@@ -651,18 +659,33 @@ func sendNotifications(c *Context, post *model.Post, team *model.Team, channel *
 		updateMentionChans = append(updateMentionChans, Srv.Store.Channel().IncrementMentionCount(post.ChannelId, id))
 	}
 
-	senderName := ""
-
 	var sender *model.User
-	if post.IsSystemMessage() {
-		senderName = c.T("system.message.name")
-	} else if profile, ok := profileMap[post.UserId]; ok {
-		if value, ok := post.Props["override_username"]; ok && post.Props["from_webhook"] == "true" {
-			senderName = value.(string)
-		} else {
-			senderName = profile.Username
+	senderName := make(map[string]string)
+	for _, id := range mentionedUsersList {
+		senderName[id] = ""
+		if post.IsSystemMessage() {
+			senderName[id] = c.T("system.message.name")
+		} else if profile, ok := profileMap[post.UserId]; ok {
+			if value, ok := post.Props["override_username"]; ok && post.Props["from_webhook"] == "true" {
+				senderName[id] = value.(string)
+			} else {
+				//Get the Display name preference from the receiver
+				if result := <-Srv.Store.Preference().Get(id, model.PREFERENCE_CATEGORY_DISPLAY_SETTINGS, "name_format"); result.Err != nil {
+					// Show default sender's name if user doesn't set display settings.
+					senderName[id] = profile.Username
+				} else {
+					senderName[id] = profile.GetDisplayNameForPreference(result.Data.(model.Preference).Value)
+				}
+			}
+			sender = profile
 		}
-		sender = profile
+	}
+
+	var senderUsername string
+	if value, ok := post.Props["override_username"]; ok && post.Props["from_webhook"] == "true" {
+		senderUsername = value.(string)
+	} else {
+		senderUsername = profileMap[post.UserId].Username
 	}
 
 	if utils.Cfg.EmailSettings.SendEmailNotifications {
@@ -682,7 +705,7 @@ func sendNotifications(c *Context, post *model.Post, team *model.Team, channel *
 			}
 
 			if userAllowsEmails && status.Status != model.STATUS_ONLINE {
-				go sendNotificationEmail(c, post, profileMap[id], channel, team, senderName, sender)
+				go sendNotificationEmail(c, post, profileMap[id], channel, team, senderName[id], sender)
 			}
 		}
 	}
@@ -695,7 +718,7 @@ func sendNotifications(c *Context, post *model.Post, team *model.Team, channel *
 			post.UserId,
 			&model.Post{
 				ChannelId: post.ChannelId,
-				Message:   utils.T("api.post.disabled_here", map[string]interface{}{"Users": *utils.Cfg.TeamSettings.MaxNotificationsPerChannel}),
+				Message:   c.T("api.post.disabled_here", map[string]interface{}{"Users": *utils.Cfg.TeamSettings.MaxNotificationsPerChannel}),
 				CreateAt:  post.CreateAt + 1,
 			},
 		)
@@ -708,7 +731,7 @@ func sendNotifications(c *Context, post *model.Post, team *model.Team, channel *
 			post.UserId,
 			&model.Post{
 				ChannelId: post.ChannelId,
-				Message:   utils.T("api.post.disabled_channel", map[string]interface{}{"Users": *utils.Cfg.TeamSettings.MaxNotificationsPerChannel}),
+				Message:   c.T("api.post.disabled_channel", map[string]interface{}{"Users": *utils.Cfg.TeamSettings.MaxNotificationsPerChannel}),
 				CreateAt:  post.CreateAt + 1,
 			},
 		)
@@ -721,7 +744,7 @@ func sendNotifications(c *Context, post *model.Post, team *model.Team, channel *
 			post.UserId,
 			&model.Post{
 				ChannelId: post.ChannelId,
-				Message:   utils.T("api.post.disabled_all", map[string]interface{}{"Users": *utils.Cfg.TeamSettings.MaxNotificationsPerChannel}),
+				Message:   c.T("api.post.disabled_all", map[string]interface{}{"Users": *utils.Cfg.TeamSettings.MaxNotificationsPerChannel}),
 				CreateAt:  post.CreateAt + 1,
 			},
 		)
@@ -778,7 +801,7 @@ func sendNotifications(c *Context, post *model.Post, team *model.Team, channel *
 			}
 
 			if DoesStatusAllowPushNotification(profileMap[id], status, post.ChannelId) {
-				go sendPushNotification(post, profileMap[id], channel, senderName, true)
+				go sendPushNotification(post, profileMap[id], channel, senderName[id], true)
 			}
 		}
 
@@ -791,7 +814,7 @@ func sendNotifications(c *Context, post *model.Post, team *model.Team, channel *
 				}
 
 				if DoesStatusAllowPushNotification(profileMap[id], status, post.ChannelId) {
-					go sendPushNotification(post, profileMap[id], channel, senderName, false)
+					go sendPushNotification(post, profileMap[id], channel, senderName[id], false)
 				}
 			}
 		}
@@ -801,7 +824,8 @@ func sendNotifications(c *Context, post *model.Post, team *model.Team, channel *
 	message.Add("post", post.ToJson())
 	message.Add("channel_type", channel.Type)
 	message.Add("channel_display_name", channel.DisplayName)
-	message.Add("sender_name", senderName)
+	message.Add("channel_name", channel.Name)
+	message.Add("sender_name", senderUsername)
 	message.Add("team_id", team.Id)
 
 	if len(post.FileIds) != 0 {
@@ -902,14 +926,6 @@ func sendNotificationEmail(c *Context, post *model.Post, user *model.User, chann
 		subjectText = userLocale("api.post.send_notifications_and_forget.message_subject")
 
 		senderDisplayName := senderName
-		if sender != nil {
-			if result := <-Srv.Store.Preference().Get(user.Id, model.PREFERENCE_CATEGORY_DISPLAY_SETTINGS, "name_format"); result.Err != nil {
-				// Show default sender's name if user doesn't set display settings.
-				senderDisplayName = senderName
-			} else {
-				senderDisplayName = sender.GetDisplayNameForPreference(result.Data.(model.Preference).Value)
-			}
-		}
 
 		mailTemplate = "api.templates.post_subject_in_direct_message"
 		mailParameters = map[string]interface{}{"SubjectText": subjectText, "TeamDisplayName": team.DisplayName,
@@ -1213,6 +1229,8 @@ func updatePost(c *Context, w http.ResponseWriter, r *http.Request) {
 
 		go Publish(message)
 
+		InvalidateCacheForChannelPosts(rpost.ChannelId)
+
 		w.Write([]byte(rpost.ToJson()))
 	}
 }
@@ -1265,7 +1283,7 @@ func getPosts(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	etagChan := Srv.Store.Post().GetEtag(id)
+	etagChan := Srv.Store.Post().GetEtag(id, true)
 
 	if !HasPermissionToChannelContext(c, id, model.PERMISSION_CREATE_POST) {
 		return
@@ -1273,7 +1291,7 @@ func getPosts(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	etag := (<-etagChan).Data.(string)
 
-	if HandleEtag(etag, w, r) {
+	if HandleEtag(etag, "Get Posts", w, r) {
 		return
 	}
 
@@ -1306,7 +1324,7 @@ func getPostsSince(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pchan := Srv.Store.Post().GetPostsSince(id, time)
+	pchan := Srv.Store.Post().GetPostsSince(id, time, true)
 
 	if !HasPermissionToChannelContext(c, id, model.PERMISSION_READ_CHANNEL) {
 		return
@@ -1347,7 +1365,7 @@ func getPost(c *Context, w http.ResponseWriter, r *http.Request) {
 	if result := <-pchan; result.Err != nil {
 		c.Err = result.Err
 		return
-	} else if HandleEtag(result.Data.(*model.PostList).Etag(), w, r) {
+	} else if HandleEtag(result.Data.(*model.PostList).Etag(), "Get Post", w, r) {
 		return
 	} else {
 		list := result.Data.(*model.PostList)
@@ -1388,7 +1406,7 @@ func getPostById(c *Context, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if HandleEtag(list.Etag(), w, r) {
+		if HandleEtag(list.Etag(), "Get Post By Id", w, r) {
 			return
 		}
 
@@ -1429,7 +1447,7 @@ func getPermalinkTmp(c *Context, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if HandleEtag(list.Etag(), w, r) {
+		if HandleEtag(list.Etag(), "Get Permalink TMP", w, r) {
 			return
 		}
 
@@ -1495,6 +1513,8 @@ func deletePost(c *Context, w http.ResponseWriter, r *http.Request) {
 		go DeletePostFiles(post)
 		go DeleteFlaggedPost(c.Session.UserId, post)
 
+		InvalidateCacheForChannelPosts(post.ChannelId)
+
 		result := make(map[string]string)
 		result["id"] = postId
 		w.Write([]byte(model.MapToJson(result)))
@@ -1554,14 +1574,14 @@ func getPostsBeforeOrAfter(c *Context, w http.ResponseWriter, r *http.Request, b
 	}
 
 	// We can do better than this etag in this situation
-	etagChan := Srv.Store.Post().GetEtag(id)
+	etagChan := Srv.Store.Post().GetEtag(id, true)
 
 	if !HasPermissionToChannelContext(c, id, model.PERMISSION_READ_CHANNEL) {
 		return
 	}
 
 	etag := (<-etagChan).Data.(string)
-	if HandleEtag(etag, w, r) {
+	if HandleEtag(etag, "Get Posts Before or After", w, r) {
 		return
 	}
 
@@ -1671,9 +1691,10 @@ func getFileInfosForPost(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	etag := model.GetEtagForFileInfos(infos)
 
-	if HandleEtag(etag, w, r) {
+	if HandleEtag(etag, "Get File Infos For Post", w, r) {
 		return
 	} else {
+		w.Header().Set("Cache-Control", "max-age=2592000, public")
 		w.Header().Set(model.HEADER_ETAG_SERVER, etag)
 		w.Write([]byte(model.FileInfosToJson(infos)))
 	}

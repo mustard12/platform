@@ -258,6 +258,43 @@
         outline: none;
         text-align: center;
     }
+
+    .new-messages__button {
+        @include opacity(0);
+        bottom: 0;
+        font-size: 13.5px;
+        left: 0;
+        margin: 0 auto;
+        position: absolute;
+        right: 0;
+        text-align: center;
+        visibility: hidden;
+        z-index: 1;
+
+        .fa {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-right: .5rem;
+            position: relative;
+            top: 1px;
+        }
+
+        div {
+            @include border-radius(50px);
+            cursor: pointer;
+            display: inline-block;
+            padding: 5px 10px;
+        }
+
+        &.visible {
+            @include opacity(1);
+            visibility: visible;
+        }
+
+        &.disabled {
+            display: none;
+        }
+    }
 }
 
 .post-list__timestamp {
@@ -381,12 +418,12 @@
         .btn-file {
             @include opacity(.5);
             @include single-transition(all, .15s);
-            color: #444444;
             font-size: 16px;
             padding: 7px 9px 6px;
             position: absolute;
             right: 0;
             top: 1px;
+            z-index: 5;
 
             svg {
                 height: 18px;
@@ -409,25 +446,29 @@
         @include clearfix;
         font-size: 13px;
         padding: 3px 0 0;
+        position: relative;
 
-        .control-label {
+        .post-error {
             font-weight: normal;
             margin-bottom: 0;
-            position: relative;
-            top: -5px;
-        }
-    }
+            display: inline-block;
+            font-size: .85em;
+            @include opacity(.55);
+            position: absolute;
+            top: 4px;
+      }
+  }
 
-    .msg-typing {
-        @include opacity(.7);
-        display: block;
-        font-size: .95em;
-        height: 20px;
-        margin-bottom: 5px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
+  .msg-typing {
+    @include opacity(.7);
+    display: block;
+    font-size: .95em;
+    height: 20px;
+    margin-bottom: 5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 }
 
 .post-list__table {
@@ -966,6 +1007,7 @@
             li {
                 ul,
                 ol {
+                    font-size: 1em;
                     margin: 0;
                     padding: 0 0 0 20px;
                 }
@@ -1205,4 +1247,36 @@
 .permalink-popover {
     margin-left: 50px !important;
     min-width: 320px;
+}
+
+.post-reaction {
+    @include user-select(none);
+    @include border-radius(3px);
+    border: 1px solid $primary-color;
+    cursor: pointer;
+    display: inline-block;
+    font-size: 11px;
+    height: 23px;
+    padding: 0 4px 0 3px;
+    margin-right: 5px;
+    margin-bottom: 5px;
+
+    .post-reaction__emoji {
+        height: 16px;
+        margin: 2px 3px 0 0;
+        vertical-align: top;
+        width: 16px;
+    }
+
+    .post-reaction__count {
+        line-height: 10px;
+        position: relative;
+        top: 3px;
+    }
+
+    &--current-user {
+        .post-reaction__count {
+            font-weight: 600;
+        }
+    }
 }

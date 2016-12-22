@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"runtime/debug"
+
 	l4g "github.com/alecthomas/log4go"
 	"github.com/gorilla/mux"
 	"github.com/mattermost/platform/einterfaces"
@@ -20,7 +22,6 @@ import (
 	"github.com/mattermost/platform/store"
 	"github.com/mattermost/platform/utils"
 	"github.com/mssola/user_agent"
-	"runtime/debug"
 )
 
 func InitAdmin() {
@@ -31,6 +32,7 @@ func InitAdmin() {
 	BaseRoutes.Admin.Handle("/config", ApiAdminSystemRequired(getConfig)).Methods("GET")
 	BaseRoutes.Admin.Handle("/save_config", ApiAdminSystemRequired(saveConfig)).Methods("POST")
 	BaseRoutes.Admin.Handle("/reload_config", ApiAdminSystemRequired(reloadConfig)).Methods("GET")
+	BaseRoutes.Admin.Handle("/invalidate_all_caches", ApiAdminSystemRequired(invalidateAllCaches)).Methods("GET")
 	BaseRoutes.Admin.Handle("/test_email", ApiAdminSystemRequired(testEmail)).Methods("POST")
 	BaseRoutes.Admin.Handle("/recycle_db_conn", ApiAdminSystemRequired(recycleDatabaseConnection)).Methods("GET")
 	BaseRoutes.Admin.Handle("/analytics/{id:[A-Za-z0-9]+}/{name:[A-Za-z0-9_]+}", ApiAdminSystemRequired(getAnalytics)).Methods("GET")
@@ -111,7 +113,7 @@ func getAllAudits(c *Context, w http.ResponseWriter, r *http.Request) {
 		audits := result.Data.(model.Audits)
 		etag := audits.Etag()
 
-		if HandleEtag(etag, w, r) {
+		if HandleEtag(etag, "Get All Audits", w, r) {
 			return
 		}
 
@@ -140,6 +142,24 @@ func reloadConfig(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	// start/restart email batching job if necessary
 	InitEmailBatching()
+
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	ReturnStatusOK(w)
+}
+
+func invalidateAllCaches(c *Context, w http.ResponseWriter, r *http.Request) {
+	debug.FreeOSMemory()
+
+	InvalidateAllCaches()
+
+	if einterfaces.GetClusterInterface() != nil {
+		err := einterfaces.GetClusterInterface().InvalidateAllCaches()
+		if err != nil {
+			c.Err = err
+			return
+		}
+
+	}
 
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	ReturnStatusOK(w)

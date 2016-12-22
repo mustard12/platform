@@ -7,12 +7,14 @@ import {browserHistory} from 'react-router/es6';
 
 import TeamStore from 'stores/team_store.jsx';
 import * as GlobalActions from 'actions/global_actions.jsx';
+import {loadStatusesForChannelAndSidebar} from 'actions/status_actions.jsx';
 import AppDispatcher from 'dispatcher/app_dispatcher.jsx';
 import Constants from 'utils/constants.jsx';
 const ActionTypes = Constants.ActionTypes;
 import * as AsyncClient from 'utils/async_client.jsx';
 import Client from 'client/web_client.jsx';
 import ChannelStore from 'stores/channel_store.jsx';
+import BrowserStore from 'stores/browser_store.jsx';
 
 import emojiRoute from 'routes/route_emoji.jsx';
 import integrationsRoute from 'routes/route_integrations.jsx';
@@ -62,21 +64,26 @@ function preNeedsTeam(nextState, replace, callback) {
     // First check to make sure you're in the current team
     // for the current url.
     const teamName = nextState.params.team;
-    var team = TeamStore.getByName(teamName);
+    const team = TeamStore.getByName(teamName);
 
     if (!team) {
         browserHistory.push('/');
         return;
     }
 
+    TeamStore.saveMyTeam(team);
+    BrowserStore.setGlobalItem('team', team.id);
+    TeamStore.emitChange();
     GlobalActions.emitCloseRightHandSide();
 
-    TeamStore.saveMyTeam(team);
-    TeamStore.emitChange();
-    loadProfilesAndTeamMembersForDMSidebar();
-    AsyncClient.getMyChannelMembers();
+    if (nextState.location.pathname.indexOf('/channels/') > -1 ||
+        nextState.location.pathname.indexOf('/pl/') > -1) {
+        loadProfilesAndTeamMembersForDMSidebar();
+        AsyncClient.getMyTeamsUnread();
+        AsyncClient.getMyChannelMembers();
+    }
 
-    var d1 = $.Deferred(); //eslint-disable-line new-cap
+    const d1 = $.Deferred(); //eslint-disable-line new-cap
 
     Client.getChannels(
         (data) => {
@@ -84,6 +91,8 @@ function preNeedsTeam(nextState, replace, callback) {
                 type: ActionTypes.RECEIVED_CHANNELS,
                 channels: data
             });
+
+            loadStatusesForChannelAndSidebar();
 
             d1.resolve();
         },
@@ -98,6 +107,20 @@ function preNeedsTeam(nextState, replace, callback) {
     });
 }
 
+function selectLastChannel(nextState, replace, callback) {
+    const team = TeamStore.getByName(nextState.params.team);
+    const channelId = BrowserStore.getGlobalItem(team.id);
+    const channel = ChannelStore.getChannelById(channelId);
+
+    let channelName = 'town-square';
+    if (channel) {
+        channelName = channel.name;
+    }
+
+    replace(`/${team.name}/channels/${channelName}`);
+    callback();
+}
+
 function onPermalinkEnter(nextState, replace, callback) {
     const postId = nextState.params.postid;
     GlobalActions.emitPostFocusEvent(
@@ -109,7 +132,7 @@ function onPermalinkEnter(nextState, replace, callback) {
 export default {
     path: ':team',
     onEnter: preNeedsTeam,
-    indexRoute: {onEnter: (nextState, replace) => replace('/' + nextState.params.team + '/channels/town-square')},
+    indexRoute: {onEnter: selectLastChannel},
     childRoutes: [
         integrationsRoute,
         emojiRoute,
@@ -123,10 +146,11 @@ export default {
                     onEnter: onChannelEnter,
                     getComponents: (location, callback) => {
                         Promise.all([
+                            System.import('components/team_sidebar/team_sidebar_controller.jsx'),
                             System.import('components/sidebar.jsx'),
                             System.import('components/channel_view.jsx')
                         ]).then(
-                        (comarr) => callback(null, {sidebar: comarr[0].default, center: comarr[1].default})
+                        (comarr) => callback(null, {team_sidebar: comarr[0].default, sidebar: comarr[1].default, center: comarr[2].default})
                         );
                     }
                 },
@@ -135,10 +159,11 @@ export default {
                     onEnter: onPermalinkEnter,
                     getComponents: (location, callback) => {
                         Promise.all([
+                            System.import('components/team_sidebar/team_sidebar_controller.jsx'),
                             System.import('components/sidebar.jsx'),
                             System.import('components/permalink_view.jsx')
                         ]).then(
-                        (comarr) => callback(null, {sidebar: comarr[0].default, center: comarr[1].default})
+                        (comarr) => callback(null, {team_sidebar: comarr[0].default, sidebar: comarr[1].default, center: comarr[2].default})
                         );
                     }
                 },
@@ -146,10 +171,11 @@ export default {
                     path: 'tutorial',
                     getComponents: (location, callback) => {
                         Promise.all([
+                            System.import('components/team_sidebar/team_sidebar_controller.jsx'),
                             System.import('components/sidebar.jsx'),
                             System.import('components/tutorial/tutorial_view.jsx')
                         ]).then(
-                        (comarr) => callback(null, {sidebar: comarr[0].default, center: comarr[1].default})
+                        (comarr) => callback(null, {team_sidebar: comarr[0].default, sidebar: comarr[1].default, center: comarr[2].default})
                         );
                     }
                 }

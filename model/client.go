@@ -48,6 +48,13 @@ type Result struct {
 	Data      interface{}
 }
 
+type ResponseMetadata struct {
+	StatusCode int
+	Error      *AppError
+	RequestId  string
+	Etag       string
+}
+
 type Client struct {
 	Url           string       // The location of the server like "http://localhost:8065"
 	ApiUrl        string       // The api location of the server like "http://localhost:8065/api/v3"
@@ -621,6 +628,19 @@ func (c *Client) AutocompleteUsersInTeam(term string) (*Result, *AppError) {
 	}
 }
 
+// AutocompleteUsers returns a list for autocompletion of users on the system that match the provided term,
+// matching against username, full name and nickname. Must be authenticated.
+func (c *Client) AutocompleteUsers(term string) (*Result, *AppError) {
+	url := fmt.Sprintf("/users/autocomplete?term=%s", url.QueryEscape(term))
+	if r, err := c.DoApiGet(url, "", ""); err != nil {
+		return nil, err
+	} else {
+		defer closeBody(r)
+		return &Result{r.Header.Get(HEADER_REQUEST_ID),
+			r.Header.Get(HEADER_ETAG_SERVER), UserListFromJson(r.Body)}, nil
+	}
+}
+
 // LoginById authenticates a user by user id and password.
 func (c *Client) LoginById(id string, password string) (*Result, *AppError) {
 	m := make(map[string]string)
@@ -813,12 +833,9 @@ func (c *Client) EmailToLDAP(m map[string]string) (*Result, *AppError) {
 	}
 }
 
-func (c *Client) Command(channelId string, command string, suggest bool) (*Result, *AppError) {
-	m := make(map[string]string)
-	m["command"] = command
-	m["channelId"] = channelId
-	m["suggest"] = strconv.FormatBool(suggest)
-	if r, err := c.DoApiPost(c.GetTeamRoute()+"/commands/execute", MapToJson(m)); err != nil {
+func (c *Client) Command(channelId string, command string) (*Result, *AppError) {
+	args := &CommandArgs{ChannelId: channelId, Command: command}
+	if r, err := c.DoApiPost(c.GetTeamRoute()+"/commands/execute", args.ToJson()); err != nil {
 		return nil, err
 	} else {
 		defer closeBody(r)
@@ -954,6 +971,16 @@ func (c *Client) GetConfig() (*Result, *AppError) {
 func (c *Client) ReloadConfig() (bool, *AppError) {
 	c.clearExtraProperties()
 	if r, err := c.DoApiGet("/admin/reload_config", "", ""); err != nil {
+		return false, err
+	} else {
+		c.fillInExtraProperties(r)
+		return c.CheckStatusOK(r), nil
+	}
+}
+
+func (c *Client) InvalidateAllCaches() (bool, *AppError) {
+	c.clearExtraProperties()
+	if r, err := c.DoApiGet("/admin/invalidate_all_caches", "", ""); err != nil {
 		return false, err
 	} else {
 		c.fillInExtraProperties(r)
@@ -1232,6 +1259,16 @@ func (c *Client) GetChannels(etag string) (*Result, *AppError) {
 	}
 }
 
+func (c *Client) GetChannelByName(channelName string) (*Result, *AppError) {
+	if r, err := c.DoApiGet(c.GetChannelNameRoute(channelName), "", ""); err != nil {
+		return nil, err
+	} else {
+		defer closeBody(r)
+		return &Result{r.Header.Get(HEADER_REQUEST_ID),
+			r.Header.Get(HEADER_ETAG_SERVER), ChannelFromJson(r.Body)}, nil
+	}
+}
+
 func (c *Client) JoinChannel(id string) (*Result, *AppError) {
 	if r, err := c.DoApiPost(c.GetChannelRoute(id)+"/join", ""); err != nil {
 		return nil, err
@@ -1299,6 +1336,7 @@ func (c *Client) RemoveChannelMember(id, user_id string) (*Result, *AppError) {
 // UpdateLastViewedAt will mark a channel as read.
 // The channelId indicates the channel to mark as read. If active is true, push notifications
 // will be cleared if there are unread messages. The default for active is true.
+// SCHEDULED FOR DEPRECATION IN 3.8 - use ViewChannel instead
 func (c *Client) UpdateLastViewedAt(channelId string, active bool) (*Result, *AppError) {
 	data := make(map[string]interface{})
 	data["active"] = active
@@ -1308,6 +1346,24 @@ func (c *Client) UpdateLastViewedAt(channelId string, active bool) (*Result, *Ap
 		defer closeBody(r)
 		return &Result{r.Header.Get(HEADER_REQUEST_ID),
 			r.Header.Get(HEADER_ETAG_SERVER), nil}, nil
+	}
+}
+
+// ViewChannel performs all the actions related to viewing a channel. This includes marking
+// the channel and the previous one as read, marking the channel as being actively viewed.
+// ChannelId is required but may be blank to indicate no channel is being viewed.
+// PrevChannelId is optional, populate to indicate a channel switch occurred. Optionally
+// provide a non-zero Time, in Unix milliseconds, to manually set the viewing time.
+func (c *Client) ViewChannel(params ChannelView) (bool, *ResponseMetadata) {
+	if r, err := c.DoApiPost(c.GetTeamRoute()+"/channels/view", params.ToJson()); err != nil {
+		return false, &ResponseMetadata{StatusCode: r.StatusCode, Error: err}
+	} else {
+		return c.CheckStatusOK(r),
+			&ResponseMetadata{
+				StatusCode: r.StatusCode,
+				RequestId:  r.Header.Get(HEADER_REQUEST_ID),
+				Etag:       r.Header.Get(HEADER_ETAG_SERVER),
+			}
 	}
 }
 
@@ -1688,6 +1744,7 @@ func (c *Client) GetStatusesByIds(userIds []string) (*Result, *AppError) {
 // SetActiveChannel sets the the channel id the user is currently viewing.
 // The channelId key is required but the value can be blank. Returns standard
 // response.
+// SCHEDULED FOR DEPRECATION IN 3.8 - use ViewChannel instead
 func (c *Client) SetActiveChannel(channelId string) (*Result, *AppError) {
 	data := map[string]string{}
 	data["channel_id"] = channelId
@@ -1722,6 +1779,36 @@ func (c *Client) GetTeamMembers(teamId string, offset int, limit int) (*Result, 
 	}
 }
 
+// GetMyTeamMembers will return an array with team member objects that the current user
+// is a member of. Must be authenticated.
+func (c *Client) GetMyTeamMembers() (*Result, *AppError) {
+	if r, err := c.DoApiGet("/teams/members", "", ""); err != nil {
+		return nil, err
+	} else {
+		defer closeBody(r)
+		return &Result{r.Header.Get(HEADER_REQUEST_ID),
+			r.Header.Get(HEADER_ETAG_SERVER), TeamMembersFromJson(r.Body)}, nil
+	}
+}
+
+// GetMyTeamsUnread will return an array with TeamUnread objects that contain the amount of
+// unread messages and mentions the current user has for the teams it belongs to.
+// An optional team ID can be set to exclude that team from the results. Must be authenticated.
+func (c *Client) GetMyTeamsUnread(teamId string) (*Result, *AppError) {
+	endpoint := "/teams/unread"
+
+	if teamId != "" {
+		endpoint += fmt.Sprintf("?id=%s", url.QueryEscape(teamId))
+	}
+	if r, err := c.DoApiGet(endpoint, "", ""); err != nil {
+		return nil, err
+	} else {
+		defer closeBody(r)
+		return &Result{r.Header.Get(HEADER_REQUEST_ID),
+			r.Header.Get(HEADER_ETAG_SERVER), TeamsUnreadFromJson(r.Body)}, nil
+	}
+}
+
 // GetTeamMember will return a team member object based on the team id and user id provided.
 // Must be authenticated.
 func (c *Client) GetTeamMember(teamId string, userId string) (*Result, *AppError) {
@@ -1738,6 +1825,18 @@ func (c *Client) GetTeamMember(teamId string, userId string) (*Result, *AppError
 // based on the team id provided. Must be authenticated.
 func (c *Client) GetTeamStats(teamId string) (*Result, *AppError) {
 	if r, err := c.DoApiGet(fmt.Sprintf("/teams/%v/stats", teamId), "", ""); err != nil {
+		return nil, err
+	} else {
+		defer closeBody(r)
+		return &Result{r.Header.Get(HEADER_REQUEST_ID),
+			r.Header.Get(HEADER_ETAG_SERVER), TeamStatsFromJson(r.Body)}, nil
+	}
+}
+
+// GetTeamStats will return a team stats object containing the number of users on the team
+// based on the team id provided. Must be authenticated.
+func (c *Client) GetTeamByName(teamName string) (*Result, *AppError) {
+	if r, err := c.DoApiGet(fmt.Sprintf("/teams/name/%v", teamName), "", ""); err != nil {
 		return nil, err
 	} else {
 		defer closeBody(r)
@@ -2089,6 +2188,7 @@ func (c *Client) DeleteEmoji(id string) (bool, *AppError) {
 	if r, err := c.DoApiPost(c.GetEmojiRoute()+"/delete", MapToJson(data)); err != nil {
 		return false, err
 	} else {
+		defer closeBody(r)
 		c.fillInExtraProperties(r)
 		return c.CheckStatusOK(r), nil
 	}
@@ -2119,6 +2219,7 @@ func (c *Client) UploadCertificateFile(data []byte, contentType string) *AppErro
 		return AppErrorFromJson(rp.Body)
 	} else {
 		defer closeBody(rp)
+		c.fillInExtraProperties(rp)
 		return nil
 	}
 }
@@ -2130,6 +2231,7 @@ func (c *Client) RemoveCertificateFile(filename string) *AppError {
 		return err
 	} else {
 		defer closeBody(r)
+		c.fillInExtraProperties(r)
 		return nil
 	}
 }
@@ -2141,6 +2243,7 @@ func (c *Client) SamlCertificateStatus(filename string) (map[string]interface{},
 		return nil, err
 	} else {
 		defer closeBody(r)
+		c.fillInExtraProperties(r)
 		return StringInterfaceFromJson(r.Body), nil
 	}
 }
@@ -2167,5 +2270,38 @@ func (c *Client) GetFileInfosForPost(channelId string, postId string, etag strin
 		defer closeBody(r)
 		c.fillInExtraProperties(r)
 		return FileInfosFromJson(r.Body), nil
+	}
+}
+
+// Saves an emoji reaction for a post in the given channel. Returns the saved reaction if successful, otherwise returns an AppError.
+func (c *Client) SaveReaction(channelId string, reaction *Reaction) (*Reaction, *AppError) {
+	if r, err := c.DoApiPost(c.GetChannelRoute(channelId)+fmt.Sprintf("/posts/%v/reactions/save", reaction.PostId), reaction.ToJson()); err != nil {
+		return nil, err
+	} else {
+		defer closeBody(r)
+		c.fillInExtraProperties(r)
+		return ReactionFromJson(r.Body), nil
+	}
+}
+
+// Removes an emoji reaction for a post in the given channel. Returns nil if successful, otherwise returns an AppError.
+func (c *Client) DeleteReaction(channelId string, reaction *Reaction) *AppError {
+	if r, err := c.DoApiPost(c.GetChannelRoute(channelId)+fmt.Sprintf("/posts/%v/reactions/delete", reaction.PostId), reaction.ToJson()); err != nil {
+		return err
+	} else {
+		defer closeBody(r)
+		c.fillInExtraProperties(r)
+		return nil
+	}
+}
+
+// Lists all emoji reactions made for the given post in the given channel. Returns a list of Reactions if successful, otherwise returns an AppError.
+func (c *Client) ListReactions(channelId string, postId string) ([]*Reaction, *AppError) {
+	if r, err := c.DoApiGet(c.GetChannelRoute(channelId)+fmt.Sprintf("/posts/%v/reactions", postId), "", ""); err != nil {
+		return nil, err
+	} else {
+		defer closeBody(r)
+		c.fillInExtraProperties(r)
+		return ReactionsFromJson(r.Body), nil
 	}
 }
