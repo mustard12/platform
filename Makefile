@@ -61,7 +61,7 @@ start-docker:
 
 	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-mysql) -eq 0 ]; then \
 		echo starting mattermost-mysql; \
-		sudo docker run --name mattermost-mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=mostest \
+		sudo docker run --name mattermost-mysql -p 3309:3306 -e MYSQL_ROOT_PASSWORD=mostest \
 		-e MYSQL_USER=mmuser -e MYSQL_PASSWORD=mostest -e MYSQL_DATABASE=mattermost_test -d mysql:5.7 > /dev/null; \
 	elif [ $(shell docker ps | grep -ci mattermost-mysql) -eq 0 ]; then \
 		echo restarting mattermost-mysql; \
@@ -70,7 +70,7 @@ start-docker:
 
 	@if [ $(shell sudo docker  ps -a | grep -ci mattermost-postgres) -eq 0 ]; then \
 		echo starting mattermost-postgres; \
-		sudo docker run --name mattermost-postgres -p 5432:5432 -e POSTGRES_USER=mmuser -e POSTGRES_PASSWORD=mostest \
+		sudo docker run --name mattermost-postgres -p 5433:5432 -e POSTGRES_USER=mmuser -e POSTGRES_PASSWORD=mostest \
 		-d postgres:9.4 > /dev/null; \
 	elif [ $(shell sudo docker  ps | grep -ci mattermost-postgres) -eq 0 ]; then \
 		echo restarting mattermost-postgres; \
